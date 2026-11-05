@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VMware Cost Optimization Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect fill='%230f6e56' width='16' height='16' rx='3'/%3E%3C/svg%3E">
+  <style>{{ css | safe }}</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">FinOps</p>
+    <h1>VMware Cost Optimization Agent</h1>
+    <p class="sub">Parallel login across vCenter, NSX, NSX-T, Aria Operations, and VCF. Waste, savings, and recommendations stay on the fast path: cached repeats, a four-second AI cutoff, and PowerCLI only when you ask for it.</p>
+    <div class="toolbar">
+      <a class="button secondary" href="/admin">Endpoints</a>
+      <button id="run" type="button">Analyze demo estate</button>
+      <button id="live" class="secondary" type="button">Analyze registered endpoints</button>
+      <button id="probe" class="secondary" type="button">Test configured logins</button>
+      <button id="teams" class="secondary" type="button">Notify Teams</button>
+      <button id="powerbi" class="secondary" type="button">Push Power BI</button>
+      <a class="button secondary" id="html-link" href="/v1/reports/latest.html">HTML report</a>
+      <a class="button secondary" id="csv-link" href="/v1/reports/latest.csv">CSV</a>
+      <div class="time-pill" id="time-pill">Waiting</div>
+    </div>
+    <div id="banner"></div>
+  </header>
+  <main>
+    <section class="kpis" id="kpis"></section>
+    <section class="grid">
+      <div class="panel">
+        <h2>Endpoints</h2>
+        <div class="endpoints" id="endpoints">Run an analysis to see login time per system.</div>
+      </div>
+      <div class="panel">
+        <h2>Savings by category</h2>
+        <div class="bars" id="bars"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Recommendations</h2>
+      <p id="ai-summary" class="muted">The rules engine ranks findings by committed savings. A model is used only when an API key is configured, and only within a four-second budget.</p>
+      <div class="actions" id="actions"></div>
+    </section>
+    <section class="panel">
+      <h2>Findings</h2>
+      <div class="filters">
+        <input id="search" type="search" placeholder="Filter by name, category, or endpoint" aria-label="Filter findings">
+        <select id="severity" aria-label="Severity">
+          <option value="">All severities</option>
+          <option>high</option>
+          <option>medium</option>
+          <option>low</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Resource</th>
+            <th>Category</th>
+            <th>Signal</th>
+            <th class="money">Monthly</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </main>
+  <footer>
+    Advisory only. This agent does not power off, resize, or delete vSphere, NSX, or VCF objects. The conservative total excludes host and VCF consolidation because that capacity is already reflected on virtual machines.
+  </footer>
+  <script>
+    const state = { findings: [], payload: null };
+    const money = (value, currency) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(value || 0);
+    const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+    function setBusy(busy) {
+      for (const id of ["run", "live", "probe", "teams", "powerbi"]) document.getElementById(id).disabled = busy;
+    }
+
+    function banner(text, warn) {
+      const node = document.getElementById("banner");
+      node.className = warn ? "banner" : "";
+      node.textContent = text || "";
+    }
+
+    async function post(body) {
+      const started = performance.now();
+      setBusy(true);
+      banner("");
+      try {
+        const response = await fetch("/v1/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const payload = await response.json();
+        const clientMs = performance.now() - started;
+        if (!response.ok) {
+          banner(payload.detail || "Analysis failed", true);
+          document.getElementById("time-pill").textContent = clientMs.toFixed(0) + " ms";
+          return;
+        }
+        render(payload, clientMs);
+      } catch (error) {
+        banner(String(error), true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function render(payload, clientMs) {
+      state.payload = payload;
+      state.findings = payload.findings || [];
+      const summary = payload.summary;
+      const cache = payload.cache_hit ? " · cached" : "";
+      document.getElementById("time-pill").textContent =
+        clientMs.toFixed(0) + " ms round trip · server " + Number(payload.duration_ms).toFixed(0) + " ms" + cache;
+      document.getElementById("kpis").innerHTML = [
+        ["Committed / month", money(summary.conservative_monthly_usd, summary.currency)],
+        ["Annual", money(summary.annual_conservative_usd, summary.currency)],
+        ["Consolidation upside", money(summary.upside_monthly_usd, summary.currency)],
+        ["Findings", String(summary.finding_count)]
+      ].map(([label, value]) => `<article class="card"><span>${label}</span><strong>${esc(value)}</strong></article>`).join("");
+
+      document.getElementById("endpoints").innerHTML = (payload.endpoints || []).map((item) => `
+        <div class="endpoint">
+          <span class="kind">${esc(item.kind)}</span>
+          <span>${esc(item.id)} · ${esc(item.detail || item.url)}${item.error ? " · " + esc(item.error) : ""}</span>
+          <strong class="${item.ok ? "ok" : "bad"}">${Number(item.latency_ms).toFixed(1)} ms</strong>
+        </div>`).join("") || "<p class='muted'>No endpoints.</p>";
+
+      const entries = Object.entries(summary.by_category || {});
+      const max = Math.max(1, ...entries.map(([, value]) => value));
+      const upside = new Set(["underutilized_host", "vcf_idle_capacity"]);
+      document.getElementById("bars").innerHTML = entries.map(([key, value]) => `
+        <div class="bar-row">
+          <span>${esc(key.replaceAll("_", " "))}</span>
+          <div class="track"><div class="fill ${upside.has(key) ? "upside" : ""}" style="width:${Math.max(4, value / max * 100)}%"></div></div>
+          <span class="num">${esc(money(value, summary.currency))}</span>
+        </div>`).join("") || "<p class='muted'>No savings.</p>";
+
+      const ai = payload.ai || { summary: "", actions: [], source: "rules" };
+      document.getElementById("ai-summary").textContent = (ai.source === "model" ? "Model. " : "Rules engine. ") + ai.summary;
+      document.getElementById("actions").innerHTML = (ai.actions || []).map((action) => `
+        <div class="action">
+          <span class="kind">${esc(action.risk)} risk</span>
+          <span><strong>${esc(action.title)}</strong><br><span class="muted">${esc((action.steps || []).join(" "))}</span></span>
+          <span class="num">${esc(money(action.monthly_savings_usd, summary.currency))}</span>
+        </div>`).join("");
+
+      const notes = [];
+      if (payload.partial) notes.push("One or more endpoints failed. Findings reflect the systems that responded.");
+      (payload.warnings || []).forEach((item) => notes.push(item));
+      if (payload.teams) notes.push("Teams: " + payload.teams.status + ". " + payload.teams.detail);
+      if (payload.powerbi) notes.push("Power BI: " + payload.powerbi.status + ". " + payload.powerbi.detail);
+      banner(notes.join(" "), notes.length > 0);
+      draw();
+    }
+
+    function draw() {
+      const query = document.getElementById("search").value.toLowerCase();
+      const severity = document.getElementById("severity").value;
+      const rows = state.findings.filter((item) => {
+        const hay = (item.resource_name + " " + item.category + " " + item.endpoint_id + " " + item.title).toLowerCase();
+        return (!query || hay.includes(query)) && (!severity || item.severity === severity);
+      });
+      document.getElementById("rows").innerHTML = rows.map((item) => `
+        <tr>
+          <td><span class="tag ${esc(item.severity)}">${esc(item.severity)}</span></td>
+          <td><strong>${esc(item.resource_name)}</strong><br><span class="muted">${esc(item.detail)}</span></td>
+          <td>${esc(item.category.replaceAll("_", " "))}${item.overlaps_compute ? "<br><span class='muted'>upside</span>" : ""}</td>
+          <td>${esc(item.evidence && item.evidence.metrics_source || item.endpoint_id)} · ${Math.round(item.confidence * 100)}%</td>
+          <td class="money">${esc(money(item.monthly_savings_usd, state.payload.summary.currency))}</td>
+        </tr>`).join("") || "<tr><td colspan='5'>No matching findings.</td></tr>";
+    }
+
+    document.getElementById("search").addEventListener("input", draw);
+    document.getElementById("severity").addEventListener("change", draw);
+    document.getElementById("run").addEventListener("click", () => post({ demo: true, include_ai: true }));
+    document.getElementById("live").addEventListener("click", () => post({ use_config: true, include_ai: true, refresh: true }));
+    document.getElementById("teams").addEventListener("click", () => post({ demo: true, include_ai: true, notify_teams: true }));
+    document.getElementById("powerbi").addEventListener("click", () => post({ demo: true, include_ai: true, push_powerbi: true }));
+    document.getElementById("probe").addEventListener("click", async () => {
+      setBusy(true);
+      const started = performance.now();
+      try {
+        const response = await fetch("/v1/sessions/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ use_config: true })
+        });
+        const payload = await response.json();
+        const clientMs = performance.now() - started;
+        document.getElementById("time-pill").textContent = clientMs.toFixed(0) + " ms round trip · probe " + Number(payload.duration_ms || 0).toFixed(0) + " ms";
+        if (!response.ok) {
+          banner(typeof payload.detail === "string" ? payload.detail : "Login test failed", true);
+          return;
+        }
+        document.getElementById("endpoints").innerHTML = payload.endpoints.map((item) => `
+          <div class="endpoint">
+            <span class="kind">${esc(item.kind)}</span>
+            <span>${esc(item.id)}${item.error ? " · " + esc(item.error) : " · " + esc(item.detail || "authenticated")}</span>
+            <strong class="${item.ok ? "ok" : "bad"}">${Number(item.latency_ms).toFixed(1)} ms</strong>
+          </div>`).join("");
+        banner("");
+      } catch (error) {
+        banner(String(error), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+    post({ demo: true, include_ai: true });
+  </script>
+</body>
+</html>

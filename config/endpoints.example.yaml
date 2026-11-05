@@ -1,0 +1,34 @@
+# Copy to config/endpoints.yaml. Do not commit that file.
+# password accepts a literal or ${ENV:VARIABLE_NAME}.
+endpoints:
+  - id: vc-prod
+    kind: vcenter
+    url: https://vcenter.example.com
+    username: administrator@vsphere.local
+    password: ${ENV:VCO_VC_PROD_PASSWORD}
+    verify_ssl: true
+    use_powershell: false
+    deep_stats: false
+    orphaned_disks: false
+    site: prod
+  - id: nsx-prod
+    kind: nsxt
+    url: https://nsx.example.com
+    username: admin
+    password: ${ENV:VCO_NSX_PROD_PASSWORD}
+    verify_ssl: true
+    site: prod
+  - id: aria-prod
+    kind: aria
+    url: https://aria.example.com
+    username: admin
+    password: ${ENV:VCO_ARIA_PROD_PASSWORD}
+    verify_ssl: true
+    site: prod
+  - id: vcf-prod
+    kind: vcf
+    url: https://sddc-manager.example.com
+    username: administrator@vsphere.local
+    password: ${ENV:VCO_VCF_PROD_PASSWORD}
+    verify_ssl: true
+    site: prod

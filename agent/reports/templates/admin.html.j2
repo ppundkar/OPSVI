@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Endpoints · VMware Cost Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect fill='%230f6e56' width='16' height='16' rx='3'/%3E%3C/svg%3E">
+  <style>{{ css | safe }}</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Administration</p>
+    <h1>Register endpoints</h1>
+    <p class="sub">Add each vCenter, NSX, NSX-T, Aria Operations, or VCF system once. Registered endpoints are what “Analyze registered endpoints” and the scheduled scan use. Passwords stay on this server and are not shown again.</p>
+    <div class="toolbar">
+      <a class="button secondary" href="/">Dashboard</a>
+      <button id="reset" class="secondary" type="button">New endpoint</button>
+      <div class="time-pill" id="time-pill">Ready</div>
+    </div>
+    <div id="banner"></div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2 id="form-title">Add an endpoint</h2>
+      <form id="form" class="form-grid">
+        <label>Id<input id="id" name="id" required placeholder="vc-prod" autocomplete="off"></label>
+        <label>System
+          <select id="kind" name="kind">
+            <option value="vcenter">vCenter</option>
+            <option value="nsxt">NSX-T / NSX</option>
+            <option value="nsx">NSX-V</option>
+            <option value="aria">Aria Operations</option>
+            <option value="vcf">VMware Cloud Foundation</option>
+          </select>
+        </label>
+        <label class="span-2">URL<input id="url" name="url" required placeholder="https://vcenter.example.com" autocomplete="off"></label>
+        <label>Username<input id="username" name="username" required autocomplete="off"></label>
+        <label>Password<input id="password" name="password" type="password" autocomplete="new-password" placeholder="Password or ${ENV:VCO_VC_PROD_PASSWORD}"></label>
+        <label>Site<input id="site" name="site" placeholder="prod" autocomplete="off"></label>
+        <label class="check"><input id="verify_ssl" name="verify_ssl" type="checkbox" checked> Verify TLS certificate</label>
+        <label class="check"><input id="use_powershell" name="use_powershell" type="checkbox"> Use PowerCLI for this vCenter</label>
+        <label class="check"><input id="deep_stats" name="deep_stats" type="checkbox"> Deep 7-day stats</label>
+        <label class="check"><input id="orphaned_disks" name="orphaned_disks" type="checkbox"> Scan orphaned disks</label>
+        <div class="span-2"><button type="submit" id="save">Save endpoint</button></div>
+      </form>
+      <p class="muted">PowerCLI, deep stats, and orphaned-disk scans apply to vCenter only. Leave the password blank when editing to keep the current secret. A value of ${ENV:NAME} reads that variable on the server at scan time.</p>
+    </section>
+    <section class="panel">
+      <h2>Registered</h2>
+      <table>
+        <thead>
+          <tr><th>Id</th><th>System</th><th>URL</th><th>Credential</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </main>
+  <footer>The registry file is data/endpoints.json on this server. Copy the application without that file when you move to a new server, then register the endpoints again here.</footer>
+  <script>
+    const state = { mode: "create", endpoints: [] };
+    const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+    function banner(text, warn) {
+      const node = document.getElementById("banner");
+      node.className = warn ? "banner" : "";
+      node.textContent = text || "";
+    }
+
+    function formBody() {
+      return {
+        id: document.getElementById("id").value.trim(),
+        kind: document.getElementById("kind").value,
+        url: document.getElementById("url").value.trim(),
+        username: document.getElementById("username").value.trim(),
+        password: document.getElementById("password").value,
+        site: document.getElementById("site").value.trim(),
+        verify_ssl: document.getElementById("verify_ssl").checked,
+        use_powershell: document.getElementById("use_powershell").checked,
+        deep_stats: document.getElementById("deep_stats").checked,
+        orphaned_disks: document.getElementById("orphaned_disks").checked
+      };
+    }
+
+    function credential(item) {
+      if (item.secret_source === "env") return "environment variable";
+      if (item.secret_source === "stored") return "saved on this server";
+      return "missing";
+    }
+
+    function draw() {
+      const rows = state.endpoints;
+      document.getElementById("rows").innerHTML = rows.map((item) => `
+        <tr>
+          <td><strong>${esc(item.id)}</strong><br><span class="muted">${esc(item.username)}${item.site ? " · " + esc(item.site) : ""}</span></td>
+          <td>${esc(item.kind)}</td>
+          <td>${esc(item.url)}</td>
+          <td class="${item.password_set ? "ok" : "bad"}">${esc(credential(item))}</td>
+          <td class="row-actions">
+            <button type="button" data-edit="${esc(item.id)}">Edit</button>
+            <button type="button" class="secondary" data-test="${esc(item.id)}">Test login</button>
+            <button type="button" class="secondary" data-delete="${esc(item.id)}">Remove</button>
+          </td>
+        </tr>`).join("") || "<tr><td colspan='5'>No endpoints yet. Add the first system with the form above.</td></tr>";
+    }
+
+    async function load() {
+      const started = performance.now();
+      const response = await fetch("/v1/admin/endpoints");
+      const payload = await response.json();
+      if (!response.ok) {
+        banner(payload.detail || "Could not load endpoints", true);
+        return;
+      }
+      state.endpoints = payload;
+      draw();
+      document.getElementById("time-pill").textContent = (performance.now() - started).toFixed(0) + " ms";
+    }
+
+    function resetForm() {
+      state.mode = "create";
+      document.getElementById("form").reset();
+      document.getElementById("verify_ssl").checked = true;
+      document.getElementById("id").readOnly = false;
+      document.getElementById("password").required = true;
+      document.getElementById("form-title").textContent = "Add an endpoint";
+      document.getElementById("save").textContent = "Save endpoint";
+    }
+
+    function edit(id) {
+      const item = state.endpoints.find((row) => row.id === id);
+      if (!item) return;
+      state.mode = "edit";
+      document.getElementById("id").value = item.id;
+      document.getElementById("id").readOnly = true;
+      document.getElementById("kind").value = item.kind;
+      document.getElementById("url").value = item.url;
+      document.getElementById("username").value = item.username;
+      document.getElementById("password").value = "";
+      document.getElementById("password").required = false;
+      document.getElementById("site").value = item.site || "";
+      document.getElementById("verify_ssl").checked = item.verify_ssl;
+      document.getElementById("use_powershell").checked = item.use_powershell;
+      document.getElementById("deep_stats").checked = item.deep_stats;
+      document.getElementById("orphaned_disks").checked = item.orphaned_disks;
+      document.getElementById("form-title").textContent = "Edit " + item.id;
+      document.getElementById("save").textContent = "Update endpoint";
+      banner("");
+    }
+
+    document.getElementById("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const body = formBody();
+      const creating = state.mode === "create";
+      const response = await fetch(creating ? "/v1/admin/endpoints" : "/v1/admin/endpoints/" + encodeURIComponent(body.id), {
+        method: creating ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        banner(payload.detail || "Save failed", true);
+        return;
+      }
+      banner(creating ? "Endpoint registered. It will be included in the next live scan." : "Endpoint updated.");
+      resetForm();
+      await load();
+    });
+
+    document.getElementById("rows").addEventListener("click", async (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.edit) edit(button.dataset.edit);
+      if (button.dataset.delete) {
+        if (!window.confirm("Remove " + button.dataset.delete + "?")) return;
+        const response = await fetch("/v1/admin/endpoints/" + encodeURIComponent(button.dataset.delete), { method: "DELETE" });
+        const payload = await response.json();
+        if (!response.ok) {
+          banner(payload.detail || "Remove failed", true);
+          return;
+        }
+        banner("Endpoint removed.");
+        if (document.getElementById("id").value === button.dataset.delete) resetForm();
+        await load();
+      }
+      if (button.dataset.test) {
+        button.disabled = true;
+        const started = performance.now();
+        try {
+          const response = await fetch("/v1/admin/endpoints/" + encodeURIComponent(button.dataset.test) + "/test", { method: "POST" });
+          const payload = await response.json();
+          const elapsed = (performance.now() - started).toFixed(0);
+          if (!response.ok) {
+            banner(payload.detail || "Login test failed", true);
+            return;
+          }
+          document.getElementById("time-pill").textContent = elapsed + " ms · login " + Number(payload.latency_ms).toFixed(0) + " ms";
+          banner(payload.ok ? payload.id + " accepted the login in " + Number(payload.latency_ms).toFixed(0) + " ms." : payload.id + " login failed: " + (payload.error || "unknown error"), !payload.ok);
+        } finally {
+          button.disabled = false;
+        }
+      }
+    });
+
+    document.getElementById("reset").addEventListener("click", () => { resetForm(); banner(""); });
+    document.getElementById("password").required = true;
+    load();
+  </script>
+</body>
+</html>

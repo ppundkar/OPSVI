@@ -1,0 +1,42 @@
+{
+  "name": "VMwareCostOptimization",
+  "defaultMode": "Push",
+  "tables": [
+    {
+      "name": "Findings",
+      "columns": [
+        {"name": "FindingId", "dataType": "string"},
+        {"name": "AnalysisId", "dataType": "string"},
+        {"name": "CollectedAt", "dataType": "DateTime"},
+        {"name": "Category", "dataType": "string"},
+        {"name": "Severity", "dataType": "string"},
+        {"name": "Confidence", "dataType": "Double"},
+        {"name": "EndpointId", "dataType": "string"},
+        {"name": "ResourceType", "dataType": "string"},
+        {"name": "ResourceName", "dataType": "string"},
+        {"name": "MonthlySavings", "dataType": "Double"},
+        {"name": "OverlapsCompute", "dataType": "Boolean"},
+        {"name": "Title", "dataType": "string"},
+        {"name": "Recommendation", "dataType": "string"}
+      ]
+    },
+    {
+      "name": "Summary",
+      "columns": [
+        {"name": "AnalysisId", "dataType": "string"},
+        {"name": "CollectedAt", "dataType": "DateTime"},
+        {"name": "Currency", "dataType": "string"},
+        {"name": "ConservativeMonthly", "dataType": "Double"},
+        {"name": "GrossMonthly", "dataType": "Double"},
+        {"name": "AnnualConservative", "dataType": "Double"},
+        {"name": "ThreeYearConservative", "dataType": "Double"},
+        {"name": "FindingCount", "dataType": "Int64"},
+        {"name": "VmCount", "dataType": "Int64"},
+        {"name": "CollectMs", "dataType": "Double"},
+        {"name": "TotalMs", "dataType": "Double"},
+        {"name": "Partial", "dataType": "Boolean"},
+        {"name": "AiSource", "dataType": "string"}
+      ]
+    }
+  ]
+}

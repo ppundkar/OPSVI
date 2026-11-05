@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.pyc
+.env
+data/endpoints.json
+data/*.tmp
+config/endpoints.yaml
+out/
+*.log

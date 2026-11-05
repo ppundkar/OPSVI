@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VMware cost report {{ result.analysis_id }}</title>
+  <style>{{ css | safe }}</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">VMware cost report</p>
+    <h1>{{ "{:,.0f}".format(result.summary.conservative_monthly_usd) }} {{ result.summary.currency }} / month</h1>
+    <p class="sub">
+      Analysis {{ result.analysis_id }} · {{ result.collected_at }} · {{ result.mode }} ·
+      server {{ "%.0f"|format(result.duration_ms) }} ms
+      {% if result.cache_hit %} · cached{% endif %}
+    </p>
+  </header>
+  <main>
+    <section class="kpis">
+      <article class="card"><span>Committed monthly</span><strong>{{ "{:,.0f}".format(result.summary.conservative_monthly_usd) }}</strong></article>
+      <article class="card"><span>Annual</span><strong>{{ "{:,.0f}".format(result.summary.annual_conservative_usd) }}</strong></article>
+      <article class="card"><span>Three year</span><strong>{{ "{:,.0f}".format(result.summary.three_year_conservative_usd) }}</strong></article>
+      <article class="card"><span>Consolidation upside</span><strong>{{ "{:,.0f}".format(result.summary.upside_monthly_usd) }}</strong></article>
+    </section>
+    <section class="panel">
+      <h2>Recommendation · {{ result.ai.source }}</h2>
+      <p>{{ result.ai.summary }}</p>
+      <div class="actions">
+        {% for action in result.ai.actions %}
+        <div class="action">
+          <span class="kind">{{ action.risk }} risk</span>
+          <span><strong>{{ action.title }}</strong><br><span class="muted">{{ action.steps | join(" ") }}</span></span>
+          <span class="num">{{ "{:,.0f}".format(action.monthly_savings_usd) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Collection</h2>
+      <div class="endpoints">
+        {% for item in result.endpoints %}
+        <div class="endpoint">
+          <span class="kind">{{ item.kind }}</span>
+          <span>{{ item.id }} · {{ item.detail or item.url }}{% if item.error %} · {{ item.error }}{% endif %}</span>
+          <strong class="{{ 'ok' if item.ok else 'bad' }}">{{ "%.1f"|format(item.latency_ms) }} ms</strong>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="muted">
+        {{ result.counts.vms }} VMs · {{ result.counts.hosts }} hosts · {{ result.counts.datastores }} datastores ·
+        {{ result.counts.segments }} segments · {{ result.counts.gateways }} gateways ·
+        {{ result.counts.vcf_clusters }} VCF clusters.
+        Collect {{ "%.0f"|format(result.collect_ms) }} ms · analyze {{ "%.0f"|format(result.analyze_ms) }} ms ·
+        recommendations {{ "%.0f"|format(result.ai_ms) }} ms.
+      </p>
+    </section>
+    <section class="panel">
+      <h2>Findings</h2>
+      <table>
+        <thead>
+          <tr><th>Severity</th><th>Resource</th><th>Category</th><th>Confidence</th><th class="money">Monthly</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for item in result.findings %}
+          <tr>
+            <td><span class="tag {{ item.severity }}">{{ item.severity }}</span></td>
+            <td><strong>{{ item.resource_name }}</strong><br><span class="muted">{{ item.detail }}</span></td>
+            <td>{{ item.category }}{% if item.overlaps_compute %}<br><span class="muted">upside</span>{% endif %}</td>
+            <td>{{ "%.0f"|format(item.confidence * 100) }}%</td>
+            <td class="money">{{ "{:,.2f}".format(item.monthly_savings_usd) }}</td>
+            <td>{{ item.recommendation }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    <section class="panel">
+      <h2>How savings are calculated</h2>
+      <p>Powered-off and suspended guests include compute plus used storage, because the action is deletion after a backup check. Idle guests include compute only, with a holdback, because the disks may stay. Rightsizing is the price of the vCPU or memory removed, and memory keeps headroom above the observed average. Snapshot and orphaned-disk savings are storage-only. Unused segments and idle load balancers use the network rates in the contract file. Host and VCF figures are consolidation upside and are excluded from the committed total.</p>
+      <p class="muted">Rates are monthly contract assumptions, not an invoice. Replace them in config/rates.yaml. Aria averages override vCenter point samples when both exist. This report does not change infrastructure.</p>
+    </section>
+  </main>
+</body>
+</html>

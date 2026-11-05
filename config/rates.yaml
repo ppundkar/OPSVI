@@ -1,0 +1,29 @@
+# Monthly contract rates. Replace these with your EA or cloud-commit prices.
+currency: USD
+cpu_vcpu_month: 18.0
+memory_gb_month: 3.5
+storage_gb_month: 0.06
+snapshot_gb_month: 0.09
+nsx_segment_month: 12.0
+nsx_lb_month: 75.0
+nsx_gateway_month: 40.0
+host_month: 450.0
+idle_reclaim_factor: 0.85
+min_monthly_savings: 1.0
+thresholds:
+  powered_off_days: 14
+  idle_cpu_pct: 5
+  idle_mem_pct: 20
+  oversize_cpu_pct: 20
+  oversize_mem_pct: 30
+  min_vcpu_to_resize: 4
+  min_mem_gb: 8
+  min_target_mem_gb: 2
+  mem_headroom: 0.70
+  snapshot_days: 7
+  host_idle_cpu_pct: 15
+  host_idle_mem_pct: 20
+  host_low_vm_count: 2
+  vcf_idle_cpu_pct: 30
+  vcf_idle_mem_pct: 35
+  vcf_min_hosts: 4
