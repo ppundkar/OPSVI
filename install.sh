@@ -27,11 +27,21 @@ if [[ ! -f "$ROOT/.env" ]]; then
   cp "$ROOT/.env.example" "$ROOT/.env"
 fi
 chmod 600 "$ROOT/.env" || true
+chmod +x "$ROOT/enable-https.sh" "$ROOT/start.sh" || true
+
+configured="$(grep '^VCO_SSL_CERTFILE=' "$ROOT/.env" | head -n 1 | cut -d= -f2- || true)"
+if [[ -n "$configured" && ( -f "$ROOT/$configured" || -f "$configured" ) ]]; then
+  echo "Keeping the HTTPS certificate already on this server."
+elif [[ -f "$ROOT/data/tls/cert.pem" && -f "$ROOT/data/tls/key.pem" ]]; then
+  echo "Keeping the HTTPS certificate already on this server."
+else
+  "$ROOT/enable-https.sh"
+fi
 
 echo
 echo "Installed in $ROOT"
 echo "Start:  ./start.sh"
-echo "Admin:  http://127.0.0.1:8080/admin"
+echo "Admin:  https://127.0.0.1:8080/admin"
 echo "Guide:  INSTALL.md"
 echo
 

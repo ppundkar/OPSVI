@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Endpoints · VMware Cost Agent</title>
+  <title>Endpoints · {{ product_short }}</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect fill='%230f6e56' width='16' height='16' rx='3'/%3E%3C/svg%3E">
   <style>{{ css | safe }}</style>
 </head>
 <body>
   <header>
-    <p class="eyebrow">Administration</p>
+    <p class="eyebrow">{{ product_short }}</p>
     <h1>Register endpoints</h1>
     <p class="sub">Add each vCenter, NSX, NSX-T, Aria Operations, or VCF system once. Registered endpoints are what “Analyze registered endpoints” and the scheduled scan use. Passwords stay on this server and are not shown again.</p>
     <div class="toolbar">

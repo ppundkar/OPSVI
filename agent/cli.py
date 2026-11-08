@@ -14,7 +14,7 @@ from agent.service import TtlCache, run_analysis
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the VMware cost optimization agent once")
+    parser = argparse.ArgumentParser(description="Run VOCE once")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--demo", action="store_true")
     source.add_argument("--use-config", action="store_true")

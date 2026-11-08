@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     powerbi_dataset_id: str = ""
     rates_path: str = ""
     endpoints_path: str = ""
+    ssl_certfile: str = ""
+    ssl_keyfile: str = ""
 
 
 @lru_cache

@@ -1,10 +1,10 @@
 # Installation
 
-Install the VMware Cost Optimization Agent on Windows or Linux, then register vCenter, NSX, Aria Operations, and VCF from the admin page. The same folder runs on any server that has Python 3.11 or newer. The agent does not change vSphere, NSX, or VCF objects.
+Install VOCE (VMware Cost Optimization Engine) on Windows or Linux, then register vCenter, NSX, Aria Operations, and VCF from the admin page. The same folder runs on any server that has Python 3.11 or newer. VOCE does not change vSphere, NSX, or VCF objects.
 
 ## What you copy
 
-Copy this project folder to the server. Leave out `.venv`, `.env`, `out`, and `data/endpoints.json` from another machine. Those are created on the server where the agent runs. `data/endpoints.json` contains the passwords registered in the admin page.
+Copy this project folder to the server. Leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls` from another machine. Those are created on the server where VOCE runs. `data/endpoints.json` contains the passwords registered in the admin page. `data/tls` contains that server's private key.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ To register a task that starts the agent when the server boots:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service
 ```
 
-The task name is `VMware Cost Agent`.
+The task name is `VOCE`.
 
 ## Linux
 
@@ -55,18 +55,18 @@ The unit file is written to `/etc/systemd/system/vmware-cost-agent.service` usin
 
 ## First start
 
-The installer creates a virtual environment, installs the Python packages, creates `data` and `out`, and copies `.env.example` to `.env` when `.env` is missing.
+The installer creates a virtual environment, installs the Python packages, creates `data` and `out`, and copies `.env.example` to `.env` when `.env` is missing. It also creates a default HTTPS certificate when this server does not already have one.
 
 Open:
 
-- Dashboard: http://127.0.0.1:8080
-- Endpoint admin: http://127.0.0.1:8080/admin
+- Dashboard: https://127.0.0.1:8080
+- Endpoint admin: https://127.0.0.1:8080/admin
 
 The dashboard can analyze the built-in demo estate before any endpoint exists. Live scans use only the endpoints you register.
 
 ## Register endpoints
 
-1. Open http://127.0.0.1:8080/admin
+1. Open https://127.0.0.1:8080/admin
 2. Choose the system type.
    - vCenter: `vcenter`
    - NSX-T or current NSX: `nsxt`
@@ -88,9 +88,84 @@ PowerCLI, deep 7-day stats, and orphaned-disk scans are vCenter options. Leave t
 
 The registry is `data/endpoints.json`. Restrict that file to the account that runs the agent. It is created with mode `600` on Linux.
 
+## Default certificate
+
+`install.ps1` and `install.sh` create a certificate the first time VOCE is installed on that server. A later install leaves an existing certificate in place, including a custom one.
+
+The default certificate includes:
+
+- the computer name
+- the DNS name of the computer, when the server can resolve it
+- each IPv4 address of the server
+- `localhost` and `127.0.0.1`
+
+The files are `data/tls/cert.pem`, `data/tls/key.pem`, and `data/tls/voce.cer`. `.env` points at the first two and sets `VCO_HOST=0.0.0.0`. Open `https://127.0.0.1:8080`, `https://localhost:8080`, or `https://<server-ip>:8080`.
+
+On Windows, the install trusts that certificate for the user who ran `install.ps1`. On another computer, import `data/tls/voce.cer` into Trusted Root Certification Authorities. On Linux, browsers trust it after that same import, or after the server administrator adds `data/tls/cert.pem` to the system trust store.
+
+To use `https://<server>` with no port, set `VCO_PORT=443` and start VOCE from an elevated shell. Port 8080 is the default so the process does not need that privilege.
+
+To add a name that was not known at install time, run the helper again and restart. This replaces the default certificate.
+
+```powershell
+.\enable-https.ps1 -DnsName voce.corp.example -IpAddress 10.1.2.3
+.\start.ps1
+```
+
+```bash
+./enable-https.sh voce.corp.example 10.1.2.3
+./start.sh
+```
+
+## Install a custom certificate
+
+Use this when a company or public certificate authority should identify VOCE. Do this after the normal install. The installer will not overwrite the files once `.env` points at them.
+
+1. Ask the certificate owner for a certificate that contains the name and address browsers will use. Include the FQDN as a DNS name and the server IP as an IP address. A name missing from the certificate makes the browser warn.
+2. Collect two PEM files. The certificate file may include the server certificate and the intermediate certificates, with the server certificate first. The private key must be unencrypted. Do not send the private key by email or put it in git.
+3. If the authority delivered a `.pfx` file, convert it on the VOCE server. Git for Windows and most Linux servers include `openssl`. Replace `voce.pfx` with the file you received.
+
+```bash
+openssl pkcs12 -in voce.pfx -nokeys -out custom-cert.pem
+openssl pkcs12 -in voce.pfx -nocerts -nodes -out custom-key.pem
+```
+
+4. Copy those files into the VOCE folder:
+
+```text
+data/tls/custom-cert.pem
+data/tls/custom-key.pem
+```
+
+5. On Linux, restrict the key to the account that runs VOCE:
+
+```bash
+chmod 600 data/tls/custom-key.pem
+```
+
+6. Edit `.env` on that server. Leave every other setting as it is.
+
+```text
+VCO_HOST=0.0.0.0
+VCO_SSL_CERTFILE=data/tls/custom-cert.pem
+VCO_SSL_KEYFILE=data/tls/custom-key.pem
+```
+
+7. Restart VOCE. On Windows run `.\start.ps1`. On Linux run `./start.sh`, or `sudo systemctl restart vmware-cost-agent` when the service is installed.
+8. Open `https://<fqdn>:8080`. The browser should show the company or public authority as the issuer. If the authority is already trusted by the organization, other computers do not need `voce.cer`.
+9. Confirm a scan still runs. On the VOCE server:
+
+```powershell
+.\powershell\Invoke-CostOptimization.ps1 -Demo
+```
+
+The script trusts the certificate named by `VCO_SSL_CERTFILE`. A scheduled task on that server uses the same check.
+
+To return to the default certificate, set the two `.env` values back to `data/tls/cert.pem` and `data/tls/key.pem`, or delete those files and run `.\enable-https.ps1` or `./enable-https.sh` again.
+
 ## Listen on the network
 
-The default bind is `127.0.0.1`, so only the server itself can open the page. To reach the admin page from another computer, edit `.env`:
+The default bind is `127.0.0.1`, so only the server itself can open the page. `enable-https.ps1` sets `VCO_HOST=0.0.0.0`. To reach the page without HTTPS, edit `.env`:
 
 ```text
 VCO_HOST=0.0.0.0
@@ -98,7 +173,7 @@ VCO_PORT=8080
 VCO_API_KEY=choose-a-long-random-key
 ```
 
-Restart the agent. Put the server behind HTTPS and allow the API key. Browser calls from the admin page on the same host do not send the key, so set `VCO_API_KEY` when the port is reachable beyond localhost and call the API with the header `X-API-Key`. For a local admin on the server, leave the key empty and use an SSH tunnel or a reverse proxy that authenticates users.
+Browser calls from the dashboard do not send `VCO_API_KEY`. Leave that key empty when people use the pages in a browser, and limit the port with the firewall. Set the key when scripts call `/v1` from another machine, and send the header `X-API-Key`.
 
 Example tunnel from your workstation:
 
@@ -106,7 +181,7 @@ Example tunnel from your workstation:
 ssh -L 8080:127.0.0.1:8080 user@cost-agent-server
 ```
 
-Then open http://127.0.0.1:8080/admin on your workstation.
+Then open https://127.0.0.1:8080/admin on your workstation. The tunnel reaches the HTTPS listener, so the workstation must trust `data/tls/voce.cer` or the custom certificate.
 
 ## Teams and prices
 
@@ -158,19 +233,19 @@ VCO_POWERBI_TOKEN=<access_token>
 VCO_POWERBI_GROUP_ID=<workspace-id>
 ```
 
-Leave `VCO_POWERBI_DATASET_ID` empty on the first push. The agent creates a push dataset named `VMwareCostOptimization` in that workspace and saves the dataset ID in `out/powerbi/dataset_id.txt`.
+Leave `VCO_POWERBI_DATASET_ID` empty on the first push. The agent creates a push dataset named `VOCE` in that workspace and saves the dataset ID in `out/powerbi/dataset_id.txt`.
 
-8. Register vCenter, NSX, Aria, and VCF at `http://127.0.0.1:8080/admin`.
+8. Register vCenter, NSX, Aria, and VCF at `https://127.0.0.1:8080/admin`.
 9. Push the live scan:
 
 ```powershell
 .\powershell\Invoke-CostOptimization.ps1 -UseConfig -PushPowerBI -Refresh
 ```
 
-The same call over HTTP:
+The same call over HTTPS:
 
 ```http
-POST http://127.0.0.1:8080/v1/optimize
+POST https://127.0.0.1:8080/v1/optimize
 Content-Type: application/json
 
 {"use_config":true,"include_ai":true,"refresh":true,"push_powerbi":true}
@@ -242,13 +317,13 @@ Refresh the Entra token into `VCO_POWERBI_TOKEN` before the scan. Then run `Invo
 Windows, after the agent is already running as a service or you start it at boot:
 
 ```powershell
-schtasks /Create /TN "VMware Cost Scan" /SC WEEKLY /D MON /ST 06:00 /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\path\to\AIOPS\powershell\Invoke-CostOptimization.ps1 -UseConfig -NotifyTeams -PushPowerBI -Refresh"
+schtasks /Create /TN "VOCE Scan" /SC WEEKLY /D MON /ST 06:00 /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\path\to\AIOPS\powershell\Invoke-CostOptimization.ps1 -UseConfig -NotifyTeams -PushPowerBI -Refresh"
 ```
 
 Linux cron, with the agent already listening:
 
 ```text
-0 6 * * 1 curl -s -X POST http://127.0.0.1:8080/v1/optimize -H 'Content-Type: application/json' -d '{"use_config":true,"include_ai":true,"refresh":true,"notify_teams":true,"push_powerbi":true}'
+0 6 * * 1 curl -s --cacert /path/to/AIOPS/data/tls/cert.pem -X POST https://127.0.0.1:8080/v1/optimize -H 'Content-Type: application/json' -d '{"use_config":true,"include_ai":true,"refresh":true,"notify_teams":true,"push_powerbi":true}'
 ```
 
 `-UseConfig` and `use_config` read the endpoints saved in the admin page.
@@ -266,7 +341,7 @@ Re-registering on the new server avoids copying passwords inside the application
 ## Checks
 
 ```text
-GET http://127.0.0.1:8080/health
+GET https://127.0.0.1:8080/health
 ```
 
 returns `"status": "ok"`. The admin page lists every saved endpoint. Test login on each row before the first live analysis.

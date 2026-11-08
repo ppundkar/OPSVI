@@ -8,6 +8,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from agent import PRODUCT_NAME, PRODUCT_SHORT
 from agent.config import OUT
 from agent.models import OptimizeResponse
 
@@ -19,16 +20,20 @@ _ENV = Environment(
 _CSS = (TEMPLATE_DIR / "theme.css").read_text(encoding="utf-8")
 
 
+def _brand() -> dict[str, str]:
+    return {"product_name": PRODUCT_NAME, "product_short": PRODUCT_SHORT}
+
+
 def render_dashboard() -> str:
-    return _ENV.get_template("dashboard.html.j2").render(css=_CSS)
+    return _ENV.get_template("dashboard.html.j2").render(css=_CSS, **_brand())
 
 
 def render_admin() -> str:
-    return _ENV.get_template("admin.html.j2").render(css=_CSS)
+    return _ENV.get_template("admin.html.j2").render(css=_CSS, **_brand())
 
 
 def render_report(result: OptimizeResponse) -> str:
-    return _ENV.get_template("report.html.j2").render(css=_CSS, result=result)
+    return _ENV.get_template("report.html.j2").render(css=_CSS, result=result, **_brand())
 
 
 def findings_csv(result: OptimizeResponse) -> str:

@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VMware cost report {{ result.analysis_id }}</title>
+  <title>{{ product_short }} report {{ result.analysis_id }}</title>
   <style>{{ css | safe }}</style>
 </head>
 <body>
   <header>
-    <p class="eyebrow">VMware cost report</p>
+    <p class="eyebrow">{{ product_short }}</p>
     <h1>{{ "{:,.0f}".format(result.summary.conservative_monthly_usd) }} {{ result.summary.currency }} / month</h1>
     <p class="sub">
       Analysis {{ result.analysis_id }} · {{ result.collected_at }} · {{ result.mode }} ·

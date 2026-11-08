@@ -9,7 +9,7 @@
     The agent calculates savings, writes HTML and CSV, and can notify Teams or Power BI.
 
 .PARAMETER Agent
-    Base URL of the cost agent. Default is http://127.0.0.1:8080.
+    Base URL of VOCE. Default is https://127.0.0.1:8080.
 
 .PARAMETER Demo
     Analyze the included demo estate.
@@ -34,7 +34,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Agent = "http://127.0.0.1:8080",
+    [string]$Agent = "https://127.0.0.1:8080",
     [switch]$Demo,
     [switch]$UseConfig,
     [switch]$CollectVCenter,
@@ -74,6 +74,29 @@ if ($CollectVCenter) {
     $body = '{"demo":true,"include_ai":true,"refresh":' + (Convert-Flag $Refresh) + ',"notify_teams":' + (Convert-Flag $NotifyTeams) + ',"push_powerbi":' + (Convert-Flag $PushPowerBI) + '}'
 } else {
     $body = '{"use_config":true,"include_ai":true,"refresh":' + (Convert-Flag $Refresh) + ',"notify_teams":' + (Convert-Flag $NotifyTeams) + ',"push_powerbi":' + (Convert-Flag $PushPowerBI) + '}'
+}
+
+if ($Agent -like "https://*") {
+    $certFile = Join-Path $PSScriptRoot "..\data\tls\cert.pem"
+    $envFile = Join-Path $PSScriptRoot "..\.env"
+    if (Test-Path $envFile) {
+        foreach ($line in Get-Content $envFile) {
+            if ($line -match '^VCO_SSL_CERTFILE=(.+)$' -and $Matches[1].Trim()) {
+                $configured = $Matches[1].Trim()
+                if (-not [System.IO.Path]::IsPathRooted($configured)) {
+                    $configured = Join-Path $PSScriptRoot "..\$configured"
+                }
+                if (Test-Path $configured) { $certFile = $configured }
+            }
+        }
+    }
+    if (Test-Path $certFile) {
+        $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 (Resolve-Path $certFile)).Thumbprint
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {
+            param($sender, $certificate, $chain, $sslPolicyErrors)
+            return $sslPolicyErrors -eq 0 -or $certificate.GetCertHashString().ToUpperInvariant() -eq $thumb.ToUpperInvariant()
+        }
+    }
 }
 
 $response = Invoke-RestMethod -Method Post -Uri ($Agent.TrimEnd("/") + "/v1/optimize") -Headers $headers -Body $body -TimeoutSec 180

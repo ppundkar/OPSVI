@@ -23,9 +23,9 @@ def build_card(result: OptimizeResponse) -> dict:
     return {
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
-        "summary": f"VMware savings {summary.conservative_monthly_usd:,.0f} {summary.currency}/month",
+        "summary": f"VOCE savings {summary.conservative_monthly_usd:,.0f} {summary.currency}/month",
         "themeColor": "0F6E56",
-        "title": "VMware cost optimization",
+        "title": "VOCE",
         "sections": [{"facts": facts, "text": "\n".join(lines)}],
     }
 

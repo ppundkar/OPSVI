@@ -28,17 +28,34 @@ if (-not (Test-Path ".\.env")) {
     Copy-Item ".\.env.example" ".\.env"
 }
 
+$configuredCert = ""
+foreach ($line in Get-Content ".\.env") {
+    if ($line -match '^VCO_SSL_CERTFILE=(.+)$') { $configuredCert = $Matches[1].Trim() }
+}
+$certExists = $false
+if ($configuredCert) {
+    $certExists = Test-Path $configuredCert
+}
+if (-not $certExists) {
+    $certExists = (Test-Path ".\data\tls\cert.pem") -and (Test-Path ".\data\tls\key.pem")
+}
+if ($certExists) {
+    Write-Host "Keeping the HTTPS certificate already on this server."
+} else {
+    & ".\enable-https.ps1"
+}
+
 Write-Host ""
 Write-Host "Installed in $Root"
 Write-Host "Start:  .\start.ps1"
-Write-Host "Admin:  http://127.0.0.1:8080/admin"
+Write-Host "Admin:  https://127.0.0.1:8080/admin"
 Write-Host "Guide:  INSTALL.md"
 Write-Host ""
 
 if ($Service) {
     $task = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Root\start.ps1`""
-    schtasks /Create /TN "VMware Cost Agent" /SC ONSTART /RL LIMITED /F /TR $task | Out-Host
-    Write-Host "Startup task 'VMware Cost Agent' registered."
+    schtasks /Create /TN "VOCE" /SC ONSTART /RL LIMITED /F /TR $task | Out-Host
+    Write-Host "Startup task 'VOCE' registered."
 }
 
 if ($Start) {

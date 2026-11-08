@@ -1,5 +1,5 @@
 [Unit]
-Description=VMware Cost Optimization Agent
+Description=VMware Cost Optimization Engine (VOCE)
 After=network-online.target
 Wants=network-online.target
 

@@ -1,4 +1,4 @@
-"""HTTP API for the VMware cost optimization agent."""
+"""HTTP API for VOCE."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="VMware Cost Optimization Agent",
+    title="VOCE",
     version=__version__,
     lifespan=lifespan,
 )

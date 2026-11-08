@@ -1,6 +1,6 @@
-# VMware Cost Optimization Agent
+# VOCE
 
-Advisory FinOps agent for vCenter, NSX-V, NSX-T, Aria Operations, and VMware Cloud Foundation. It logs in to the systems you configure, inventories them in parallel, prices the waste, and writes an HTML report, a CSV file, a Teams card, and a Power BI push dataset. It does not power off, resize, or delete anything.
+VMware Cost Optimization Engine. Advisory FinOps for vCenter, NSX-V, NSX-T, Aria Operations, and VMware Cloud Foundation. It logs in to the systems you configure, inventories them in parallel, prices the waste, and writes an HTML report, a CSV file, a Teams card, and a Power BI push dataset. It does not power off, resize, or delete anything.
 
 ## Run it
 
@@ -10,7 +10,7 @@ On a new server, follow [INSTALL.md](INSTALL.md). From this folder after install
 .\start.ps1
 ```
 
-Open http://127.0.0.1:8080 for the dashboard and http://127.0.0.1:8080/admin to register vCenter, NSX, Aria, and VCF. The dashboard can analyze the built-in demo estate before any endpoint exists. Analyze registered endpoints uses the systems saved in the admin page.
+Installation creates a default HTTPS certificate for this computer's name, its IP addresses, `localhost`, and `127.0.0.1`. Open https://127.0.0.1:8080 for the dashboard and https://127.0.0.1:8080/admin to register vCenter, NSX, Aria, and VCF. The dashboard can analyze the built-in demo estate before any endpoint exists. Analyze registered endpoints uses the systems saved in the admin page.
 
 ```powershell
 .\.venv\Scripts\python -m pytest
@@ -53,7 +53,7 @@ Aria 7-day averages replace vCenter point samples when both describe the same VM
 
 ## Connect a live estate
 
-Register each system at http://127.0.0.1:8080/admin. The page writes `data/endpoints.json` on this server. Choose `vcenter`, `nsxt`, `nsx`, `aria`, or `vcf`, then save and use Test login. Step-by-step moves between servers are in [INSTALL.md](INSTALL.md).
+Register each system at https://127.0.0.1:8080/admin. The page writes `data/endpoints.json` on this server. Choose `vcenter`, `nsxt`, `nsx`, `aria`, or `vcf`, then save and use Test login. Step-by-step moves between servers are in [INSTALL.md](INSTALL.md).
 
 A password may be the real secret or `${ENV:VARIABLE_NAME}`. The variable is read from the server environment or `.env` when the agent starts.
 
@@ -66,7 +66,7 @@ For a Windows jump host with PowerCLI, set `use_powershell: true` on the vCenter
 Weekly task:
 
 ```powershell
-schtasks /Create /TN "VMware Cost Agent" /SC WEEKLY /D MON /ST 06:00 /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\AIOPS\powershell\Invoke-CostOptimization.ps1 -UseConfig -NotifyTeams -PushPowerBI -Refresh"
+schtasks /Create /TN "VOCE Scan" /SC WEEKLY /D MON /ST 06:00 /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\AIOPS\powershell\Invoke-CostOptimization.ps1 -UseConfig -NotifyTeams -PushPowerBI -Refresh"
 ```
 
 To collect vCenter on a host that has PowerCLI and then hand the inventory to the agent:
