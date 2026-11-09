@@ -8,10 +8,76 @@ Copy this project folder to the server. Leave out `.venv`, `.env`, `out`, `data/
 
 ## Requirements
 
-- Python 3.11 or newer on the PATH (`python` on Windows, `python3` on Linux)
-- Outbound HTTPS from this server to each endpoint
-- For PowerCLI collection only: Windows, VMware PowerCLI, and the vCenter endpoint option “Use PowerCLI” in the admin page
-- Optional: a Teams webhook and a Power BI service principal, set in `.env`
+Install these on the jump box before you run `install.ps1` or `install.sh`. The VOCE installer does not install Python.
+
+| What | Required | What it is for |
+| --- | --- | --- |
+| Windows or Linux | Yes | The server or jump box where VOCE runs. PowerCLI works only on Windows. |
+| Python 3.11 or newer | Yes | Runs the app. The command is `python` on Windows and `python3` on Linux, and it must be on `PATH`. |
+| pip and venv | Yes | The installer creates `.venv` and installs the Python packages. No C compiler is required. |
+| Outbound HTTPS, port 443 | Yes | The jump box must reach vCenter, NSX, Aria Operations, and VCF. |
+| This project folder | Yes | Copy the folder. Leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls` from another machine. |
+| Inbound TCP 8080 | When other people open the page | The browser address is `https://<jump-box>:8080`. |
+| VMware PowerCLI | Only for the deep vCenter scan | Leave it off for a normal scan. |
+| Teams webhook, Power BI, or an AI key | Only for those features | Typed into `.env` after install. Nothing extra to install. |
+
+### Install Python on a Windows jump box
+
+1. Sign in as the account that will run VOCE.
+2. Open PowerShell and install Python 3.12:
+
+```powershell
+winget install --id Python.Python.3.12 -e --source winget
+```
+
+If `winget` is not on that server, download the Windows installer from [python.org](https://www.python.org/downloads/windows/). During setup, check **Add python.exe to PATH** and include pip.
+
+3. Close PowerShell, open a new window, and check the version. It must be 3.11 or newer.
+
+```powershell
+python --version
+python -m pip --version
+```
+
+### Install Python on a Linux jump box
+
+Ubuntu or Debian:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip
+python3 --version
+```
+
+RHEL, Rocky, or Alma:
+
+```bash
+sudo dnf install -y python3 python3-pip
+python3 --version
+```
+
+If that `python3` is older than 3.11, install the `python3.11` package your distribution provides and use that command for the rest of the install. `python3 --version` must print 3.11 or newer.
+
+### Open the network
+
+From the jump box, each VMware address must answer on HTTPS. A quick check is to open the vCenter, NSX, Aria, or SDDC Manager URL in a browser on that same server.
+
+If people will open VOCE from their own computers, allow inbound TCP 8080 to the jump box. Port 443 is optional: set `VCO_PORT=443` in `.env` and start VOCE from an elevated shell.
+
+Active Directory sign-in, described later, also needs outbound TCP 636 to a domain controller.
+
+### Optional: install PowerCLI
+
+Do this only when you want the slower vCenter path: 7-day averages, events, and orphaned disks. A normal scan uses the vCenter REST API and does not need PowerCLI.
+
+On the Windows jump box, in PowerShell:
+
+```powershell
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+Install-Module -Name VMware.PowerCLI -Scope CurrentUser -Force
+```
+
+After the module is installed, turn on **Use PowerCLI for this vCenter** on that endpoint in the admin page. Leave it off on a Linux jump box. Linux has no PowerCLI path.
 
 ## Windows
 
@@ -64,29 +130,123 @@ Open:
 
 The dashboard can analyze the built-in demo estate before any endpoint exists. Live scans use only the endpoints you register.
 
-## Register endpoints
+## Get to a working scan
 
-1. Open https://127.0.0.1:8080/admin
-2. Choose the system type.
-   - vCenter: `vcenter`
-   - NSX-T or current NSX: `nsxt`
-   - NSX-V: `nsx`
-   - Aria Operations: `aria`
-   - VMware Cloud Foundation SDDC Manager: `vcf`
-3. Set an id you will recognize, such as `vc-prod`. Use letters, numbers, dots, hyphens, or underscores.
-4. Set the base URL, for example `https://vcenter.example.com`. Do not put the password in the URL.
-5. Set the username.
-6. Set the password, or enter an environment variable reference such as `${ENV:VCO_VC_PROD_PASSWORD}`. The variable must exist in the server environment or in `.env` before the agent starts.
-7. Save the endpoint.
-8. Click Test login. A successful row shows the login time. A failure shows the reason and leaves the endpoint registered.
-9. Repeat for NSX, Aria, and VCF.
-10. Return to the dashboard and click Analyze registered endpoints.
+A working setup means the dashboard opens, each system you care about has a successful **Test login**, and **Analyze registered endpoints** shows that estate. VOCE still only reads. It does not power off, resize, or delete anything. You can stop after vCenter if that is the only system you have. Add NSX, Aria, and VCF when those exist.
 
-Editing an endpoint and leaving the password blank keeps the saved secret. Remove deletes it from the next scan.
+Do the demo once before you save any password. On the dashboard, click **Analyze demo estate**. The numbers are a sample, so you can see the page works. Your own numbers appear only after the steps below.
 
-PowerCLI, deep 7-day stats, and orphaned-disk scans are vCenter options. Leave them off for the fastest scan. Turn on PowerCLI on a Windows host that has VMware PowerCLI installed.
+### 1. Put your prices in
 
-The registry is `data/endpoints.json`. Restrict that file to the account that runs the agent. It is created with mode `600` on Linux.
+Open `config/rates.yaml` on the jump box and replace the sample monthly prices with the prices your organization uses. The fields are dollars per month for one vCPU, one GB of memory, one GB of storage, one NSX segment, one load balancer, one gateway, and one host. Save the file. The next scan uses the new prices. You do not restart VOCE for this file.
+
+### 2. Create a read-only account on each system
+
+Use a separate account for VOCE. It only needs to look. It does not need rights to power off, resize, snapshot, or delete.
+
+| System | Account that is enough |
+| --- | --- |
+| vCenter | A user that can view virtual machines, hosts, and datastores. The vCenter Read-only role is enough. |
+| NSX-T or current NSX | The Auditor role, or another role that can view segments, load balancers, and gateways. |
+| NSX-V | A read-only NSX user. |
+| Aria Operations | A user that can view objects and metrics. |
+| VCF SDDC Manager | A viewer account that can see the domains and clusters. |
+
+Write down the web address, the username, and the password for each system. The address is the same one you type in a browser, for example `https://vcenter.corp.example`. Leave off any path after the host name.
+
+### 3. Open the endpoint page
+
+On the jump box, open https://127.0.0.1:8080/admin. From another computer, open `https://<jump-box-ip>:8080/admin`. If Active Directory sign-in is already on, sign in as someone in `VOCE-Admins`.
+
+You fill in one form per system, then click **Save endpoint**, then **Test login** on that row.
+
+### 4. What each box on the form means
+
+| Box | What to type |
+| --- | --- |
+| Id | A short name you will recognize, such as `vc-prod`. Letters, numbers, dots, hyphens, or underscores. Start with a letter or number. You cannot change the id later; remove the row and add it again. |
+| System | Pick the product. vCenter, NSX-T / NSX, NSX-V, Aria Operations, or VMware Cloud Foundation. |
+| URL | The site address, such as `https://vcenter.corp.example`. Do not put the username or password in the address. |
+| Username | The account from step 2. For vCenter this is often `readonly@vsphere.local` or `readonly@corp.example`. |
+| Password | The account password. To keep the password out of the page, type `${ENV:VCO_VC_PROD_PASSWORD}` and put the real password in `.env` as `VCO_VC_PROD_PASSWORD=the-password`, then restart VOCE before Test login. |
+| Site | A label such as `prod` or `lab`. It is printed with the findings so two vCenters stay distinct. |
+| Verify TLS certificate | Leave this checked when the system has a real certificate. Clear it only in a lab whose certificate the jump box does not trust. |
+| Use PowerCLI for this vCenter | Leave unchecked unless PowerCLI is installed and you want the deep scan. |
+| Deep 7-day stats | Leave unchecked for the first scan. Turn it on later, with PowerCLI, when you want a 7-day average instead of one sample. |
+| Scan orphaned disks | Leave unchecked for the first scan. It walks datastores and is the slow option. It also needs PowerCLI. |
+
+Click **Save endpoint**. The password is stored in `data/endpoints.json` on this server and is not shown again. On a later edit, leave the password box empty to keep the saved password. **Remove** drops that system from the next scan. Restrict `data/endpoints.json` to the account that runs VOCE. On Linux it is created with mode `600`.
+
+### 5. Register vCenter
+
+1. Click **New endpoint** if the form still has an old row.
+2. Id: `vc-prod`
+3. System: **vCenter**
+4. URL: `https://vcenter.corp.example`
+5. Username and password: the read-only vCenter account.
+6. Site: `prod`
+7. Leave PowerCLI, deep stats, and orphaned disks unchecked.
+8. Click **Save endpoint**.
+9. On the new row, click **Test login**. A time in the row means the login worked. The error text means it did not. Fix the address, username, or password and save again. The row stays registered either way.
+
+Add a second vCenter the same way with a different id, such as `vc-dr`.
+
+### 6. Register NSX
+
+Current NSX and NSX-T use the same choice.
+
+1. Id: `nsx-prod`
+2. System: **NSX-T / NSX**
+3. URL: `https://nsx.corp.example` (the NSX Manager address)
+4. Username and password: the Auditor or read-only account.
+5. Site: `prod`
+6. Save, then **Test login**.
+
+An older NSX-V manager uses System **NSX-V** and the NSX-V address. The PowerCLI boxes do nothing for NSX. Leave them unchecked.
+
+### 7. Register Aria Operations
+
+1. Id: `aria-prod`
+2. System: **Aria Operations**
+3. URL: `https://aria.corp.example`
+4. Username and password: the read-only Aria account.
+5. Site: `prod`
+6. Save, then **Test login**.
+
+When the same virtual machine name exists in vCenter and Aria, the scan uses Aria's 7-day average for CPU and memory. Aria is optional. The vCenter scan still runs without it.
+
+### 8. Register VMware Cloud Foundation
+
+1. Id: `vcf-prod`
+2. System: **VMware Cloud Foundation**
+3. URL: `https://sddc-manager.corp.example`
+4. Username and password: the SDDC Manager viewer account.
+5. Site: `prod`
+6. Save, then **Test login**.
+
+Skip this form when you do not have SDDC Manager. Host and VCF idle-capacity dollars are upside. They are kept out of the committed monthly total because the virtual machines already carry that cost.
+
+### 9. Run the first live scan
+
+1. Open the dashboard.
+2. Click **Analyze registered endpoints**.
+3. Wait for the totals. A banner names any system that could not log in. The other systems are still in the report.
+4. Open **HTML report** and **CSV**. The same files are under `out/reports/`.
+5. Confirm VM templates are called out as skipped. They are not priced.
+
+Click **Analyze registered endpoints** again when you want a fresh collection. An identical scan can reuse the previous result for two minutes.
+
+### 10. Turn on the rest when the scan looks right
+
+These are optional. The scan is already a working report without them.
+
+- **Your prices.** Already set in `config/rates.yaml` in step 1. Change them whenever the contract changes.
+- **Teams.** In Teams, create an incoming webhook and paste it into `.env` as `VCO_TEAMS_WEBHOOK_URL`. Restart with `.\start.ps1` or `./start.sh`. The next scan can use **Notify Teams**, or run `.\powershell\Invoke-CostOptimization.ps1 -UseConfig -NotifyTeams -Refresh`.
+- **AI recommendations.** Leave `VCO_AI_API_KEY` empty to keep the built-in ranked plan. To ask a model, set `VCO_AI_API_KEY` and restart. The model sees the findings, not the passwords. If the call fails, the report still shows the built-in plan. The exact settings are in `.env.example`.
+- **Power BI and a Monday scan.** Follow the Power BI and Scheduled scan sections below. The dashboard button **Push Power BI** sends the demo estate. A live push uses `.\powershell\Invoke-CostOptimization.ps1 -UseConfig -PushPowerBI -Refresh`.
+- **People signing in from other computers.** Follow Optional Active Directory sign-in below. Until that is on, anyone who can open the page can run a scan.
+
+A full working jump box is: Python installed, `.\start.ps1` or `./start.sh` running, prices edited, every system you own showing a successful Test login, and one live scan whose HTML report you can open.
 
 ## Default certificate
 
@@ -379,11 +539,11 @@ Linux cron, with the agent already listening:
 
 ## Move to another server
 
-1. Install Python 3.11 or newer on the new server.
-2. Copy the application folder without `.venv`, `.env`, `out`, and `data/endpoints.json`.
+1. Install Python 3.11 or newer, using the Requirements steps above.
+2. Copy the application folder without `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls`.
 3. Run `install.ps1` or `install.sh`.
 4. Edit the new `.env` for the bind address, API key, Teams, and Power BI values.
-5. Start the agent and register the endpoints again at `/admin`.
+5. Start the agent and register the endpoints again, using Get to a working scan above.
 
 Re-registering on the new server avoids copying passwords inside the application folder.
 
