@@ -340,7 +340,9 @@ The default certificate includes:
 - each IPv4 address of the server
 - `localhost` and `127.0.0.1`
 
-The files are `data/tls/cert.pem`, `data/tls/key.pem`, and `data/tls/voce.cer`. `.env` points at the first two and sets `VCO_HOST=0.0.0.0`. Open `https://127.0.0.1:8080`, `https://localhost:8080`, or `https://<server-ip>:8080`.
+The files are `data/tls/cert.pem`, `data/tls/key.pem`, and `data/tls/voce.cer`. `.env` points at the first two and sets `VCO_HOST=0.0.0.0`. Open the dashboard and admin URLs the installer prints, including the port, for example `https://jump.corp.example:8080` and `https://10.1.2.3:8080/admin`.
+
+If the browser says the site cannot provide a secure connection, the certificate name does not match the address in the bar. A certificate made on another computer, or an older certificate that only lists `localhost`, causes that. On the jump box, in the project folder, run `.\enable-https.ps1` or `./enable-https.sh`, then restart with `.\start.ps1` or `./start.sh`. Open one of the addresses it prints, including `:8080`. On another computer, import the new `data/tls/voce.cer` into Trusted Root Certification Authorities. Do not copy `data/tls` from a different server.
 
 On Windows, the install trusts that certificate for the user who ran `install.ps1`. On another computer, import `data/tls/voce.cer` into Trusted Root Certification Authorities. On Linux, browsers trust it after that same import, or after the server administrator adds `data/tls/cert.pem` to the system trust store.
 

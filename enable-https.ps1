@@ -7,23 +7,28 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
+function Invoke-WithTimeout([scriptblock]$Work, [int]$Seconds) {
+    $job = Start-Job -ScriptBlock $Work
+    if (Wait-Job $job -Timeout $Seconds) {
+        $result = Receive-Job $job
+        Remove-Job $job -Force
+        return $result
+    }
+    Stop-Job $job
+    Remove-Job $job -Force
+    return $null
+}
+
 if ($DnsName.Count -eq 0 -and $IpAddress.Count -eq 0) {
     $DnsName = @($env:COMPUTERNAME)
-    try {
-        $fqdn = [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName
-        if ($fqdn -and $DnsName -notcontains $fqdn) { $DnsName += $fqdn }
-    } catch {
-        Write-Host "Could not resolve this computer's DNS name. The certificate still includes the computer name."
-    }
-    try {
-        $IpAddress = @(
-            [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) |
-                Where-Object { $_.AddressFamily -eq "InterNetwork" -and $_.ToString() -ne "127.0.0.1" } |
-                ForEach-Object { $_.ToString() }
-        )
-    } catch {
-        $IpAddress = @()
-    }
+    $fqdn = Invoke-WithTimeout { [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName } 5
+    if ($fqdn -and $DnsName -notcontains $fqdn) { $DnsName += $fqdn }
+    $foundIps = Invoke-WithTimeout {
+        [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) |
+            Where-Object { $_.AddressFamily -eq "InterNetwork" -and $_.ToString() -ne "127.0.0.1" } |
+            ForEach-Object { $_.ToString() }
+    } 5
+    if ($foundIps) { $IpAddress = @($foundIps) }
 }
 
 $dns = [System.Collections.Generic.List[string]]::new()
@@ -62,6 +67,12 @@ New-Item -ItemType Directory -Force -Path $tls | Out-Null
 $certPath = Join-Path $tls "cert.pem"
 $keyPath = Join-Path $tls "key.pem"
 $derPath = Join-Path $tls "voce.cer"
+foreach ($locked in @($certPath, $keyPath, $derPath)) {
+    if (Test-Path $locked) {
+        attrib -R $locked
+        icacls $locked /grant:r "${env:USERNAME}:(M)" | Out-Null
+    }
+}
 
 function Convert-ToPem([byte[]]$Bytes, [string]$Label) {
     $body = [Convert]::ToBase64String($Bytes, [System.Base64FormattingOptions]::InsertLineBreaks)

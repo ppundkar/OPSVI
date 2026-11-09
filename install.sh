@@ -30,7 +30,23 @@ chmod 600 "$ROOT/.env" || true
 chmod +x "$ROOT/enable-https.sh" "$ROOT/start.sh" "$ROOT/uninstall.sh" || true
 
 configured="$(grep '^VCO_SSL_CERTFILE=' "$ROOT/.env" | head -n 1 | cut -d= -f2- || true)"
-if [[ -n "$configured" && ( -f "$ROOT/$configured" || -f "$configured" ) ]]; then
+refresh=0
+if [[ -f "$ROOT/data/tls/cert.pem" ]]; then
+  if "$ROOT/.venv/bin/python" -c "from agent.__main__ import default_cert_is_stale; raise SystemExit(2 if default_cert_is_stale() else 0)"; then
+    refresh=0
+  else
+    status=$?
+    if [[ "$status" -eq 2 ]]; then
+      refresh=1
+    else
+      exit "$status"
+    fi
+  fi
+fi
+if [[ "$refresh" -eq 1 ]]; then
+  echo "The HTTPS certificate does not include this server's name or IP. Creating a new one."
+  "$ROOT/enable-https.sh"
+elif [[ -n "$configured" && ( -f "$ROOT/$configured" || -f "$configured" ) ]]; then
   echo "Keeping the HTTPS certificate already on this server."
 elif [[ -f "$ROOT/data/tls/cert.pem" && -f "$ROOT/data/tls/key.pem" ]]; then
   echo "Keeping the HTTPS certificate already on this server."

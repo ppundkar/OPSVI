@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.__main__ import browse_urls, public_names, tls_paths
+from agent.__main__ import browse_urls, names_cover, public_names, tls_paths
 from agent.config import Settings
 from agent.main import app
 from fastapi.testclient import TestClient
@@ -36,6 +36,12 @@ def test_browse_urls_use_server_name_and_ip():
     assert urls
     assert all(url.startswith("https://") and url.endswith(":8080") for url in urls)
     assert "https://127.0.0.1:8080" not in urls or urls == ["https://127.0.0.1:8080"]
+
+
+def test_localhost_certificate_does_not_cover_a_server_name():
+    assert names_cover({"localhost", "127.0.0.1"}, ["127.0.0.1"])
+    assert not names_cover({"localhost", "127.0.0.1"}, ["jump.corp.example", "10.1.2.3"])
+    assert names_cover({"jump.corp.example", "10.1.2.3", "localhost"}, ["jump.corp.example", "10.1.2.3"])
 
 
 def test_dashboard_uses_voce_name():

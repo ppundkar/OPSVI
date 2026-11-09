@@ -40,7 +40,13 @@ if (-not $certExists) {
     $certExists = (Test-Path ".\data\tls\cert.pem") -and (Test-Path ".\data\tls\key.pem")
 }
 if ($certExists) {
-    Write-Host "Keeping the HTTPS certificate already on this server."
+    & ".\.venv\Scripts\python.exe" -c "from agent.__main__ import default_cert_is_stale; raise SystemExit(2 if default_cert_is_stale() else 0)"
+    if ($LASTEXITCODE -eq 2) {
+        Write-Host "The HTTPS certificate does not include this server's name or IP. Creating a new one."
+        & ".\enable-https.ps1"
+    } else {
+        Write-Host "Keeping the HTTPS certificate already on this server."
+    }
 } else {
     & ".\enable-https.ps1"
 }

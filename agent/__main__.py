@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+import ssl
 from pathlib import Path
 
 import uvicorn
@@ -71,6 +72,40 @@ def _host_for_url(name: str) -> str:
     return name
 
 
+def certificate_names(path: Path) -> set[str]:
+    decoded = ssl._ssl._test_decode_cert(str(path))
+    names = set()
+    for _kind, value in decoded.get("subjectAltName", ()):
+        names.add(str(value).lower())
+    for group in decoded.get("subject", ()):
+        for key, value in group:
+            if key == "commonName":
+                names.add(str(value).lower())
+    return names
+
+
+def names_cover(present: set[str], required: list[str]) -> bool:
+    folded = {item.lower() for item in present}
+    return all(name.lower() in folded for name in required)
+
+
+def certificate_covers_server(path: Path) -> bool:
+    return names_cover(certificate_names(path), server_names())
+
+
+def default_cert_is_stale() -> bool:
+    """True when the generated certificate is missing this server's name or IP."""
+
+    settings = get_settings()
+    configured = settings.ssl_certfile.strip().replace("\\", "/")
+    if configured and configured != "data/tls/cert.pem":
+        return False
+    cert = ROOT / "data" / "tls" / "cert.pem"
+    if not cert.is_file():
+        return False
+    return not certificate_covers_server(cert)
+
+
 def print_browse_urls() -> None:
     settings = get_settings()
     ssl = bool(tls_paths(settings)) if settings.ssl_certfile.strip() or settings.ssl_keyfile.strip() else False
@@ -87,6 +122,13 @@ def main() -> None:
     for url in browse_urls(settings, bool(ssl)):
         print(f"Dashboard: {url}", flush=True)
         print(f"Admin:     {url}/admin", flush=True)
+    if ssl and default_cert_is_stale():
+        print(
+            "The HTTPS certificate is only valid for localhost. "
+            "The browser will say this site cannot provide a secure connection. "
+            "Run .\\enable-https.ps1 or ./enable-https.sh, then restart VOCE.",
+            flush=True,
+        )
     uvicorn.run(
         "agent.main:app",
         host=settings.host,
