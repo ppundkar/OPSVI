@@ -2,7 +2,7 @@
 
 from agent.config import Rates, load_rates
 from agent.demo.sample import build_demo_inventory
-from agent.merge import counts_for
+from agent.merge import counts_for, exclude_templates
 from agent.models import VmRecord
 from agent.waste.engine import analyze, summarize
 
@@ -38,6 +38,11 @@ def test_demo_estate_covers_each_waste_class():
     assert "dev-sandbox" in names(findings, "idle_vm")
     assert "patch-window" not in names(findings)
     assert "win-template" not in names(findings)
+    template_inventory = build_demo_inventory()
+    assert any(vm.is_template and vm.snapshot_gb > 0 for vm in template_inventory.vms)
+    skipped = exclude_templates(template_inventory)
+    assert skipped == 1
+    assert "win-template" not in {vm.name for vm in template_inventory.vms}
     assert "healthy-erp" not in names(findings)
     assert "healthy-web" not in names(findings)
     assert "esx-04" not in names(findings)

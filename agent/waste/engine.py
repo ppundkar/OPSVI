@@ -20,12 +20,11 @@ def analyze(inventory: Inventory, rates: Rates) -> list[Finding]:
     thresholds = rates.thresholds
 
     for vm in inventory.vms:
-        if vm.power_state in OFF_STATES and not vm.is_template:
+        if vm.is_template:
+            continue
+        if vm.power_state in OFF_STATES:
             if vm.powered_off_days is None or vm.powered_off_days >= thresholds.powered_off_days:
                 findings.append(_powered_off(vm, rates))
-            continue
-        if vm.is_template:
-            _append_snapshot(findings, vm, rates)
             continue
         if _is_idle(vm, rates):
             findings.append(_idle(vm, rates))

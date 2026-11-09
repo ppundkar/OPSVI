@@ -52,14 +52,45 @@ def basic_auth(endpoint: EndpointInput) -> httpx.BasicAuth:
     return httpx.BasicAuth(endpoint.username, endpoint.password.get_secret_value())
 
 
+# Session open/close and read queries. Anything else against vCenter, NSX, Aria, or VCF is refused.
+_READ_ONLY_WRITES = {
+    ("POST", "/api/session"),
+    ("DELETE", "/api/session"),
+    ("POST", "/suite-api/api/auth/token/acquire"),
+    ("POST", "/suite-api/api/auth/token/release"),
+    ("POST", "/suite-api/api/resources/stats/query"),
+    ("POST", "/api/session/create"),
+    ("POST", "/api/session/destroy"),
+    ("POST", "/v1/tokens"),
+    ("DELETE", "/v1/tokens"),
+}
+
+
+def assert_read_only(method: str, path: str) -> None:
+    """Refuse any infrastructure call that is not a read or a session login or logout."""
+
+    normalized = path.split("?", 1)[0].rstrip("/") or "/"
+    verb = method.upper()
+    if verb in {"GET", "HEAD"}:
+        return
+    if (verb, normalized) in _READ_ONLY_WRITES:
+        return
+    raise RuntimeError(f"VOCE is read-only and refused {verb} {normalized}")
+
+
+async def _block_infrastructure_writes(request: httpx.Request) -> None:
+    assert_read_only(request.method, request.url.path)
+
+
 def client_for(endpoint: EndpointInput, timeout: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=endpoint.url,
         verify=endpoint.verify_ssl,
         timeout=httpx.Timeout(timeout),
         follow_redirects=False,
-        headers={"User-Agent": "vmware-cost-agent/1.0", "Accept": "application/json"},
+        headers={"User-Agent": "voce/1.0", "Accept": "application/json"},
         limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        event_hooks={"request": [_block_infrastructure_writes]},
     )
 
 

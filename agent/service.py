@@ -13,7 +13,7 @@ from agent.ai.recommender import recommend
 from agent.config import OUT, Rates, Settings
 from agent.demo.sample import build_demo_inventory
 from agent.endpoints import load_endpoints
-from agent.merge import counts_for, overlay_metrics
+from agent.merge import counts_for, exclude_templates, overlay_metrics
 from agent.models import (
     EndpointStatus,
     ExportPaths,
@@ -117,6 +117,9 @@ async def run_analysis(
         return result, html, csv_text
 
     mode, inventory, statuses, collect_ms = await _collect(request, settings)
+    skipped_templates = exclude_templates(inventory)
+    if skipped_templates:
+        inventory.warnings.append(f"Skipped {skipped_templates} VM templates")
     if len(inventory.vms) > MAX_VMS:
         inventory.warnings.append(f"VM analysis capped at {MAX_VMS} records")
         inventory.vms = inventory.vms[:MAX_VMS]

@@ -36,6 +36,7 @@ def build_demo_inventory() -> Inventory:
         VmRecord(
             endpoint_id=VC, id="vm-template", name="win-template", power_state="poweredOff",
             vcpu=2, memory_gb=4, used_gb=60, powered_off_days=100, is_template=True,
+            snapshot_count=2, snapshot_gb=80, oldest_snapshot_days=90,
         ),
         VmRecord(
             endpoint_id=VC, id="vm-worker", name="old-worker", power_state="suspended",

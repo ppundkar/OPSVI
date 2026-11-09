@@ -5,6 +5,15 @@ from __future__ import annotations
 from agent.models import Inventory, InventoryCounts
 
 
+def exclude_templates(inventory: Inventory) -> int:
+    """Remove VM templates so they are not priced or counted."""
+
+    kept = [vm for vm in inventory.vms if not vm.is_template]
+    skipped = len(inventory.vms) - len(kept)
+    inventory.vms = kept
+    return skipped
+
+
 def counts_for(inventory: Inventory) -> InventoryCounts:
     return InventoryCounts(
         vms=len(inventory.vms),

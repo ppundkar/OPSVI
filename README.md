@@ -37,7 +37,7 @@ Rates live in `config/rates.yaml`. Replace them with your contract prices.
 
 | Waste | Committed savings |
 | --- | --- |
-| Powered off or suspended for 14 days, templates excluded | All vCPU, memory, and used storage. Snapshots on that VM are part of the delete, not a second finding. |
+| Powered off or suspended for 14 days. VM templates are not scanned | All vCPU, memory, and used storage. Snapshots on that VM are part of the delete, not a second finding. |
 | Idle: CPU at or below 5% and memory at or below 20% | Compute only, with a 15% holdback until the change window |
 | vCPU average at or below 20% on 4 or more vCPU | Price of the vCPU removed, keeping projected utilization at or below 70% |
 | Memory average at or below 30% on 8 GB or more | Price of the memory removed, leaving 30% headroom above the observed average |

@@ -1,6 +1,14 @@
 # How to use VOCE
 
-VOCE (VMware Cost Optimization Engine) logs in to vCenter, NSX, NSX-T, Aria Operations, and VMware Cloud Foundation, prices waste, and publishes a report. It does not power off, resize, or delete anything. Installation is in [INSTALL.md](INSTALL.md).
+VOCE (VMware Cost Optimization Engine) logs in to vCenter, NSX, NSX-T, Aria Operations, and VMware Cloud Foundation, prices waste, and publishes a report. Installation is in [INSTALL.md](INSTALL.md).
+
+## What VOCE never changes
+
+A scan does not change the VMware environment. It does not power off, resize, snapshot, move, or delete virtual machines, templates, disks, hosts, NSX objects, Aria resources, or VCF clusters. Recommendations are text in the report. A person makes any change later, outside VOCE.
+
+The only calls sent to those systems are login, inventory reads, a statistics query, and logout. The collector refuses any other write before it is sent. PowerCLI uses read commands (`Get-View`, `Get-Stat`, `Get-VIEvent`, and a datastore search). `Set-PowerCLIConfiguration` changes PowerCLI preferences on the VOCE computer only.
+
+VOCE does write on its own server: the endpoint list, reports, CSV files, and, when you turn them on, a Teams message and a Power BI dataset refresh. Those are not changes to vCenter, NSX, Aria, or VCF.
 
 Open the dashboard at `https://127.0.0.1:8080` on the server, or `https://<server-name>:8080` from another computer. The first install creates the HTTPS certificate. Other computers trust it after importing `data/tls/voce.cer`.
 
@@ -34,7 +42,7 @@ Leave **Use PowerCLI**, **Deep 7-day stats**, and **Scan orphaned disks** off fo
 
 Committed savings are the items you can act on without double-counting:
 
-- Powered-off or suspended virtual machines older than 14 days, excluding templates
+- Powered-off or suspended virtual machines older than 14 days. VM templates are left out of the scan, including their snapshots.
 - Idle compute, with a 15 percent holdback
 - Oversized CPU or memory, with headroom kept
 - Snapshots older than 7 days

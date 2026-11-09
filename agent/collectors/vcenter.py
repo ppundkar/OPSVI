@@ -58,6 +58,12 @@ async def _logout(client: httpx.AsyncClient, token: str) -> None:
         return
 
 
+def _is_template(row: dict) -> bool:
+    if row.get("template") is True or row.get("is_template") is True:
+        return True
+    return str(row.get("type") or row.get("vm_type") or "").upper() == "TEMPLATE"
+
+
 def parse_vcenter_rest(vms_payload, hosts_payload, datastores_payload, endpoint_id: str) -> Inventory:
     vms: list[VmRecord] = []
     for row in as_list((vms_payload or {}).get("value") if isinstance(vms_payload, dict) else vms_payload):
@@ -68,6 +74,7 @@ def parse_vcenter_rest(vms_payload, hosts_payload, datastores_payload, endpoint_
                 id=str(row.get("vm") or row.get("id") or row.get("name")),
                 name=str(row.get("name") or row.get("vm") or "vm"),
                 power_state=row.get("power_state") or "unknown",
+                is_template=_is_template(row),
                 vcpu=int(row.get("cpu_count") or 0),
                 memory_gb=round((memory or 0) / 1024, 2),
                 metrics_source="vcenter",

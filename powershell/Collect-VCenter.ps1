@@ -6,6 +6,8 @@
     Emits one JSON document on stdout. Username and password are read from
     VCO_USERNAME and VCO_PASSWORD so they are not placed on the command line.
     Requires VMware.PowerCLI. The default path uses a single Get-View pass.
+    This script only reads inventory. It does not power off, resize, snapshot, or delete vSphere objects.
+    Set-PowerCLIConfiguration changes this computer's PowerCLI preferences only.
     -Deep adds a 7-day average and powered-off ages. -IncludeOrphanedDisks
     scans datastores and is slower.
 
@@ -186,6 +188,7 @@ try {
 
     $vms = @()
     foreach ($vm in $vmViews) {
+        if ($vm.Config -and $vm.Config.Template) { continue }
         $cpuPct = $null
         $memPct = $null
         $hostId = $null

@@ -1,6 +1,9 @@
 """Collector parsers and metric merge."""
 
+import pytest
+
 from agent.collectors.aria import parse_aria_stats
+from agent.collectors.http import assert_read_only
 from agent.collectors.nsx import parse_nsxt, parse_nsxv
 from agent.collectors.vcenter import parse_vcenter_rest
 from agent.collectors.vcf import parse_vcf
@@ -8,6 +11,16 @@ from agent.merge import overlay_metrics
 from agent.models import Inventory, MetricPatch, VmRecord
 from agent.waste.engine import analyze
 from agent.config import Rates
+
+
+def test_infrastructure_writes_are_refused():
+    assert_read_only("GET", "/api/vcenter/vm")
+    assert_read_only("POST", "/api/session")
+    assert_read_only("DELETE", "/v1/tokens")
+    with pytest.raises(RuntimeError, match="read-only"):
+        assert_read_only("POST", "/api/vcenter/vm/vm-1/power")
+    with pytest.raises(RuntimeError, match="read-only"):
+        assert_read_only("DELETE", "/api/vcenter/vm/vm-1")
 
 
 def test_vcenter_rest_normalizes_power_and_memory():
@@ -21,6 +34,16 @@ def test_vcenter_rest_normalizes_power_and_memory():
     assert inventory.vms[0].memory_gb == 2
     assert inventory.hosts[0].connected is False
     assert inventory.datastores[0].capacity_gb == 1024
+
+
+def test_vcenter_rest_marks_templates():
+    inventory = parse_vcenter_rest(
+        {"value": [{"vm": "vm-9", "name": "gold", "power_state": "POWERED_OFF", "type": "TEMPLATE"}]},
+        {"value": []},
+        {"value": []},
+        "vc-prod",
+    )
+    assert inventory.vms[0].is_template is True
 
 
 def test_nsxt_flags_only_known_empty_segments():
