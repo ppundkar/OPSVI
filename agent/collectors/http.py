@@ -83,11 +83,15 @@ async def _block_infrastructure_writes(request: httpx.Request) -> None:
 
 
 def client_for(endpoint: EndpointInput, timeout: float) -> httpx.AsyncClient:
+    # Connect is short so an unreachable IPv6 address fails over quickly.
+    # Read keeps the caller's budget for a large inventory download.
+    # trust_env is off so an HTTP proxy on the jump box is not used for vCenter.
     return httpx.AsyncClient(
         base_url=endpoint.url,
         verify=endpoint.verify_ssl,
-        timeout=httpx.Timeout(timeout),
+        timeout=httpx.Timeout(connect=3.0, read=timeout, write=10.0, pool=3.0),
         follow_redirects=False,
+        trust_env=False,
         headers={"User-Agent": "voce/1.0", "Accept": "application/json"},
         limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         event_hooks={"request": [_block_infrastructure_writes]},

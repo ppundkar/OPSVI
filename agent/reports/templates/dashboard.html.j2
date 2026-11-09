@@ -190,7 +190,7 @@
     const run = document.getElementById("run");
     if (run) {
       run.addEventListener("click", () => post({ demo: true, include_ai: true }));
-      document.getElementById("live").addEventListener("click", () => post({ use_config: true, include_ai: true, refresh: true }));
+      document.getElementById("live").addEventListener("click", () => post({ use_config: true, include_ai: false, refresh: true }));
       document.getElementById("teams").addEventListener("click", () => post({ demo: true, include_ai: true, notify_teams: true }));
       document.getElementById("powerbi").addEventListener("click", () => post({ demo: true, include_ai: true, push_powerbi: true }));
     }

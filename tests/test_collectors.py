@@ -3,7 +3,8 @@
 import pytest
 
 from agent.collectors.aria import parse_aria_stats
-from agent.collectors.http import assert_read_only
+from agent.collectors.http import assert_read_only, client_for
+from agent.models import EndpointInput
 from agent.collectors.nsx import parse_nsxt, parse_nsxv
 from agent.collectors.vcenter import parse_vcenter_rest
 from agent.collectors.vcf import parse_vcf
@@ -11,6 +12,20 @@ from agent.merge import overlay_metrics
 from agent.models import Inventory, MetricPatch, VmRecord
 from agent.waste.engine import analyze
 from agent.config import Rates
+
+
+def test_vcenter_client_does_not_wait_on_a_proxy_or_dead_address():
+    endpoint = EndpointInput(
+        id="vc-prod",
+        kind="vcenter",
+        url="https://vcenter.example",
+        username="readonly",
+        password="secret",
+    )
+    client = client_for(endpoint, 20)
+    assert client.trust_env is False
+    assert client.timeout.connect == 3.0
+    assert client.timeout.read == 20.0
 
 
 def test_infrastructure_writes_are_refused():

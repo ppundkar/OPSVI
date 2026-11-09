@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from agent.collectors.http import as_list, basic_auth, raise_for_auth, read_json
@@ -37,8 +39,6 @@ async def collect_vcenter(endpoint: EndpointInput, client: httpx.AsyncClient) ->
 
 
 async def _gather_gets(client: httpx.AsyncClient, *calls: tuple[str, dict]):
-    import asyncio
-
     return await asyncio.gather(*(client.get(path, headers=headers) for path, headers in calls))
 
 
@@ -53,7 +53,10 @@ async def _login(endpoint: EndpointInput, client: httpx.AsyncClient) -> str:
 
 async def _logout(client: httpx.AsyncClient, token: str) -> None:
     try:
-        await client.delete("/api/session", headers={"vmware-api-session-id": token})
+        await asyncio.wait_for(
+            client.delete("/api/session", headers={"vmware-api-session-id": token}),
+            timeout=2,
+        )
     except Exception:
         return
 
