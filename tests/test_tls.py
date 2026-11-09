@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.__main__ import browse_urls, choose_port, names_cover, public_names, tls_paths
+from agent.__main__ import browse_urls, choose_port, listen_host, names_cover, public_names, tls_paths, windows_firewall_command
 from agent.config import Settings
 from agent.main import app
 from fastapi.testclient import TestClient
@@ -36,6 +36,12 @@ def test_browse_urls_use_server_name_and_ip():
     assert urls
     assert all(url.startswith("https://") and url.endswith(":8080") for url in urls)
     assert "https://127.0.0.1:8080" not in urls or urls == ["https://127.0.0.1:8080"]
+
+
+def test_loopback_bind_opens_the_server_address():
+    assert listen_host("127.0.0.1") == "0.0.0.0"
+    assert listen_host("0.0.0.0") == "0.0.0.0"
+    assert "localport=8443" in windows_firewall_command(8443)
 
 
 def test_forbidden_port_moves_to_a_fallback():

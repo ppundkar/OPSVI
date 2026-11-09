@@ -354,7 +354,18 @@ If `.\start.ps1` stops with `winerror 10013` on port 8080, Windows has reserved 
 VCO_PORT=8443
 ```
 
-Run `.\start.ps1` again and open the dashboard address it prints, including the new port.
+Run `.\start.ps1` again and leave that window open. Open the dashboard address it prints, including the new port.
+
+If the browser says `192.168.11.102 refused to connect`, VOCE is not accepting that address. On the jump box:
+
+1. In `.env`, set `VCO_HOST=0.0.0.0` and `VCO_PORT=8443`.
+2. Run `.\start.ps1` and leave the window open. It must say `Uvicorn running on https://0.0.0.0:8443`.
+3. On the jump box, open `https://127.0.0.1:8443`. When that page loads, open `https://192.168.11.102:8443` from the other computer.
+4. If the jump box page loads and the other computer still refuses, open PowerShell as Administrator and run:
+
+```powershell
+netsh advfirewall firewall add rule name="VOCE 8443" dir=in action=allow protocol=TCP localport=8443 profile=any
+```
 
 To add a name that was not known at install time, run the helper again and restart. This replaces the default certificate.
 

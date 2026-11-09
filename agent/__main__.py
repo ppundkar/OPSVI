@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import ssl
+import subprocess
 from pathlib import Path
 
 import uvicorn
@@ -142,19 +144,60 @@ def choose_port(requested: int, states: dict[int, str | None]) -> int:
     )
 
 
-def remember_port(port: int) -> None:
+def remember_setting(key: str, value: str) -> None:
     path = ROOT / ".env"
     if not path.is_file():
         return
     lines = path.read_text(encoding="utf-8-sig").splitlines()
     updated = False
+    prefix = f"{key}="
     for index, line in enumerate(lines):
-        if line.startswith("VCO_PORT="):
-            lines[index] = f"VCO_PORT={port}"
+        if line.startswith(prefix):
+            lines[index] = f"{prefix}{value}"
             updated = True
     if not updated:
-        lines.append(f"VCO_PORT={port}")
+        lines.append(f"{prefix}{value}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def listen_host(host: str) -> str:
+    """Use every network address so the server name and IP both reach VOCE."""
+
+    if host.strip().lower() in {"127.0.0.1", "localhost", "::1"}:
+        return "0.0.0.0"
+    return host
+
+
+def windows_firewall_command(port: int) -> list[str]:
+    return [
+        "netsh",
+        "advfirewall",
+        "firewall",
+        "add",
+        "rule",
+        f"name=VOCE {port}",
+        "dir=in",
+        "action=allow",
+        "protocol=TCP",
+        f"localport={port}",
+        "profile=any",
+    ]
+
+
+def allow_windows_port(port: int) -> None:
+    if os.name != "nt":
+        return
+    result = subprocess.run(windows_firewall_command(port), capture_output=True, text=True)
+    text = f"{result.stdout}\n{result.stderr}".lower()
+    if result.returncode == 0 or "already exists" in text:
+        print(f"Windows Firewall allows inbound TCP {port}.", flush=True)
+        return
+    print(
+        "Other computers cannot connect until Windows Firewall allows this port. "
+        "Open PowerShell as Administrator and run:",
+        flush=True,
+    )
+    print(" ".join(windows_firewall_command(port)), flush=True)
 
 
 def resolve_port(host: str, requested: int) -> tuple[int, str]:
@@ -163,7 +206,7 @@ def resolve_port(host: str, requested: int) -> tuple[int, str]:
     chosen = choose_port(requested, states)
     if chosen == requested:
         return chosen, ""
-    remember_port(chosen)
+    remember_setting("VCO_PORT", str(chosen))
     return chosen, (
         f"Windows refused port {requested}. VOCE is using {chosen} instead, and .env now has VCO_PORT={chosen}."
     )
@@ -179,10 +222,16 @@ def print_browse_urls() -> None:
 
 def main() -> None:
     settings = get_settings()
+    host = listen_host(settings.host)
+    if host != settings.host:
+        settings.host = host
+        remember_setting("VCO_HOST", host)
+        print("VOCE is listening on every address so the server name and IP work.", flush=True)
     chosen, notice = resolve_port(settings.host, settings.port)
     settings.port = chosen
     if notice:
         print(notice, flush=True)
+    allow_windows_port(settings.port)
     ssl = tls_paths(settings)
     scheme = "https" if ssl else "http"
     print(f"VOCE listening on {scheme}://{settings.host}:{settings.port}", flush=True)

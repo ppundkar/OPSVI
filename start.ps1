@@ -4,4 +4,5 @@ $python = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $python)) {
     throw "Run .\install.ps1 first."
 }
+Write-Host "Leave this window open. Closing it stops VOCE."
 & $python -m agent @args
