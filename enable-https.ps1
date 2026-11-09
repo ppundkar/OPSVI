@@ -157,5 +157,8 @@ foreach ($line in Get-Content $envFile) {
     if ($line -match '^VCO_PORT=(\d+)$') { $port = $Matches[1] }
 }
 Write-Host "Restart with .\start.ps1"
-foreach ($name in $dns) { Write-Host "https://${name}:$port" }
-foreach ($name in $ips) { Write-Host "https://${name}:$port" }
+foreach ($name in ($dns + $ips)) {
+    if ($name -eq "localhost" -or $name -eq "127.0.0.1") { continue }
+    Write-Host "Dashboard: https://${name}:$port"
+    Write-Host "Admin:     https://${name}:$port/admin"
+}

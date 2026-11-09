@@ -48,7 +48,7 @@ if ($certExists) {
 Write-Host ""
 Write-Host "Installed in $Root"
 Write-Host "Start:  .\start.ps1"
-Write-Host "Admin:  https://127.0.0.1:8080/admin"
+& ".\.venv\Scripts\python.exe" -c "from agent.__main__ import print_browse_urls; print_browse_urls()"
 Write-Host "Guide:  INSTALL.md"
 Write-Host ""
 

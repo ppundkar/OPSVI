@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.__main__ import tls_paths
+from agent.__main__ import browse_urls, public_names, tls_paths
 from agent.config import Settings
 from agent.main import app
 from fastapi.testclient import TestClient
@@ -22,6 +22,20 @@ def test_tls_is_off_until_both_files_exist(tmp_path: Path):
     paths = tls_paths(Settings(ssl_certfile=str(present), ssl_keyfile=str(other)))
     assert paths["ssl_certfile"] == str(present)
     assert paths["ssl_keyfile"] == str(other)
+
+
+def test_browse_urls_use_server_name_and_ip():
+    assert public_names("jump", "jump.corp.example", ["10.1.2.3", "127.0.0.1"]) == [
+        "jump.corp.example",
+        "jump",
+        "10.1.2.3",
+    ]
+    assert public_names("localhost", "localhost", ["127.0.0.1"]) == ["127.0.0.1"]
+    settings = Settings(host="0.0.0.0", port=8080)
+    urls = browse_urls(settings, True)
+    assert urls
+    assert all(url.startswith("https://") and url.endswith(":8080") for url in urls)
+    assert "https://127.0.0.1:8080" not in urls or urls == ["https://127.0.0.1:8080"]
 
 
 def test_dashboard_uses_voce_name():

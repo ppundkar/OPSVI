@@ -61,7 +61,13 @@ set_line VCO_SSL_CERTFILE data/tls/cert.pem
 set_line VCO_SSL_KEYFILE data/tls/key.pem
 chmod 600 "$env_file" || true
 
+port="$(grep '^VCO_PORT=' "$env_file" | head -n 1 | cut -d= -f2- || true)"
+port="${port:-8080}"
 echo "Certificate names: $san"
 echo "Import data/tls/voce.cer on each browser computer that should trust VOCE."
 echo "Restart with ./start.sh"
-echo "Open https://$1:8080"
+for name in "$@"; do
+  [[ "$name" == localhost || "$name" == 127.* || "$name" == 169.254.* ]] && continue
+  echo "Dashboard: https://${name}:${port}"
+  echo "Admin:     https://${name}:${port}/admin"
+done

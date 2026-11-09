@@ -10,7 +10,7 @@ The only calls sent to those systems are login, inventory reads, a statistics qu
 
 VOCE does write on its own server: the endpoint list, reports, CSV files, and, when you turn them on, a Teams message and a Power BI dataset refresh. Those are not changes to vCenter, NSX, Aria, or VCF.
 
-Open the dashboard at `https://127.0.0.1:8080` on the server, or `https://<server-name>:8080` from another computer. The first install creates the HTTPS certificate. Other computers trust it after importing `data/tls/voce.cer`.
+Open the dashboard at `https://<server-name>:8080` or `https://<server-ip>:8080`. The admin page is the same address with `/admin`. The installer and `start.ps1` / `start.sh` print both addresses for this computer. The first install creates the HTTPS certificate. Other computers trust it after importing `data/tls/voce.cer`.
 
 ## Demo estate
 

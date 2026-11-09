@@ -41,7 +41,7 @@ fi
 echo
 echo "Installed in $ROOT"
 echo "Start:  ./start.sh"
-echo "Admin:  https://127.0.0.1:8080/admin"
+"$ROOT/.venv/bin/python" -c "from agent.__main__ import print_browse_urls; print_browse_urls()"
 echo "Guide:  INSTALL.md"
 echo
 

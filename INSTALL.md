@@ -207,10 +207,7 @@ The unit file is written to `/etc/systemd/system/vmware-cost-agent.service` usin
 
 The installer creates a virtual environment, installs the Python packages, creates `data` and `out`, and copies `.env.example` to `.env` when `.env` is missing. It also creates a default HTTPS certificate when this server does not already have one.
 
-Open:
-
-- Dashboard: https://127.0.0.1:8080
-- Endpoint admin: https://127.0.0.1:8080/admin
+The installer prints the dashboard and admin addresses for this server's name and IP address, for example `https://jump.corp.example:8080` and `https://jump.corp.example:8080/admin`. Use those from another computer. `https://127.0.0.1:8080` still opens the page on the server itself.
 
 The dashboard can analyze the built-in demo estate before any endpoint exists. Live scans use only the endpoints you register.
 

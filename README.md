@@ -10,7 +10,7 @@ On a new server, follow [INSTALL.md](INSTALL.md). For day-to-day use of each fea
 .\start.ps1
 ```
 
-Installation creates a default HTTPS certificate for this computer's name, its IP addresses, `localhost`, and `127.0.0.1`. Open https://127.0.0.1:8080 for the dashboard and https://127.0.0.1:8080/admin to register vCenter, NSX, Aria, and VCF. The dashboard can analyze the built-in demo estate before any endpoint exists. Analyze registered endpoints uses the systems saved in the admin page.
+Installation creates a default HTTPS certificate for this computer's name, its IP addresses, `localhost`, and `127.0.0.1`. Open `https://<server-name>:8080` or `https://<server-ip>:8080` for the dashboard, and the same address with `/admin` to register vCenter, NSX, Aria, and VCF. The installer prints those addresses. The dashboard can analyze the built-in demo estate before any endpoint exists. Analyze registered endpoints uses the systems saved in the admin page.
 
 ```powershell
 .\.venv\Scripts\python -m pytest
@@ -53,7 +53,7 @@ Aria 7-day averages replace vCenter point samples when both describe the same VM
 
 ## Connect a live estate
 
-Register each system at https://127.0.0.1:8080/admin. The page writes `data/endpoints.json` on this server. Choose `vcenter`, `nsxt`, `nsx`, `aria`, or `vcf`, then save and use Test login. Step-by-step moves between servers are in [INSTALL.md](INSTALL.md).
+Register each system at `https://<server-name>:8080/admin` or `https://<server-ip>:8080/admin`. The page writes `data/endpoints.json` on this server. Choose `vcenter`, `nsxt`, `nsx`, `aria`, or `vcf`, then save and use Test login. Step-by-step moves between servers are in [INSTALL.md](INSTALL.md).
 
 A password may be the real secret or `${ENV:VARIABLE_NAME}`. The variable is read from the server environment or `.env` when the agent starts.
 
