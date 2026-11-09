@@ -27,7 +27,7 @@ if [[ ! -f "$ROOT/.env" ]]; then
   cp "$ROOT/.env.example" "$ROOT/.env"
 fi
 chmod 600 "$ROOT/.env" || true
-chmod +x "$ROOT/enable-https.sh" "$ROOT/start.sh" || true
+chmod +x "$ROOT/enable-https.sh" "$ROOT/start.sh" "$ROOT/uninstall.sh" || true
 
 configured="$(grep '^VCO_SSL_CERTFILE=' "$ROOT/.env" | head -n 1 | cut -d= -f2- || true)"
 if [[ -n "$configured" && ( -f "$ROOT/$configured" || -f "$configured" ) ]]; then

@@ -4,7 +4,7 @@ Install VOCE (VMware Cost Optimization Engine) on Windows or Linux, then registe
 
 ## What you copy
 
-Copy this project folder to the server. Leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls` from another machine. Those are created on the server where VOCE runs. `data/endpoints.json` contains the passwords registered in the admin page. `data/tls` contains that server's private key.
+The usual way onto a jump box is `git clone`, in the next section. A folder copy also works. Leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls` from another machine. Those are created on the server where VOCE runs. `data/endpoints.json` contains the passwords registered in the admin page. `data/tls` contains that server's private key. Git ignores those files, so a later `git pull` does not overwrite them.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ Install these on the jump box before you run `install.ps1` or `install.sh`. The 
 | Python 3.11 or newer | Yes | Runs the app. The command is `python` on Windows and `python3` on Linux, and it must be on `PATH`. |
 | pip and venv | Yes | The installer creates `.venv` and installs the Python packages. No C compiler is required. |
 | Outbound HTTPS, port 443 | Yes | The jump box must reach vCenter, NSX, Aria Operations, and VCF. |
-| This project folder | Yes | Copy the folder. Leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls` from another machine. |
+| Git | Yes, when you clone | Downloads and updates the app from GitHub. The installer does not install Git. |
 | Inbound TCP 8080 | When other people open the page | The browser address is `https://<jump-box>:8080`. |
 | VMware PowerCLI | Only for the deep vCenter scan | Leave it off for a normal scan. |
 | Teams webhook, Power BI, or an AI key | Only for those features | Typed into `.env` after install. Nothing extra to install. |
@@ -78,6 +78,90 @@ Install-Module -Name VMware.PowerCLI -Scope CurrentUser -Force
 ```
 
 After the module is installed, turn on **Use PowerCLI for this vCenter** on that endpoint in the admin page. Leave it off on a Linux jump box. Linux has no PowerCLI path.
+
+## Clone or update from Git
+
+The repository is `https://github.com/ppundkar/OPSVI.git`, branch `master`. The jump box needs outbound HTTPS to GitHub. Sign in to GitHub if the repository asks for a username and password. For a password, use a GitHub personal access token, not the GitHub account password.
+
+### Install Git
+
+Windows, in PowerShell:
+
+```powershell
+winget install --id Git.Git -e --source winget
+```
+
+Close PowerShell, open a new window, and run `git --version`.
+
+Ubuntu or Debian:
+
+```bash
+sudo apt update
+sudo apt install -y git
+git --version
+```
+
+RHEL, Rocky, or Alma:
+
+```bash
+sudo dnf install -y git
+git --version
+```
+
+### First time on a jump box
+
+Pick an empty folder. The clone creates `OPSVI` inside it. On Windows, `C:\VOCE` is a simple choice. On Linux, `/opt/voce` is a simple choice.
+
+Windows:
+
+```powershell
+New-Item -ItemType Directory -Force -Path C:\VOCE
+Set-Location C:\VOCE
+git clone --branch master https://github.com/ppundkar/OPSVI.git
+Set-Location .\OPSVI
+```
+
+Linux:
+
+```bash
+sudo mkdir -p /opt/voce
+sudo chown "$USER":"$USER" /opt/voce
+cd /opt/voce
+git clone --branch master https://github.com/ppundkar/OPSVI.git
+cd OPSVI
+```
+
+You are now in the project folder. Continue with the Windows or Linux install below (`install.ps1` or `install.sh`). That creates `.venv`, `.env`, and the HTTPS certificate on this server.
+
+### Update a jump box that already has VOCE
+
+Run this in the existing project folder, the one that contains `install.ps1`. `git pull` brings in code changes. It leaves `.env`, `data/endpoints.json`, `data/tls`, and `out` on that server.
+
+Windows:
+
+```powershell
+Set-Location C:\VOCE\OPSVI
+git status
+git pull origin master
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+.\start.ps1
+```
+
+Linux:
+
+```bash
+cd /opt/voce/OPSVI
+git status
+git pull origin master
+./install.sh
+./start.sh
+```
+
+If VOCE is a systemd service, use `sudo systemctl restart vmware-cost-agent` instead of `./start.sh`.
+
+`git status` before the pull should list only files Git ignores, or nothing. If it lists a changed tracked file, such as `INSTALL.md`, that server has a local edit. Copy that file aside, run `git checkout -- INSTALL.md`, then pull again. Do not delete `.env` or `data` to clear the status. Those paths are ignored and are the live configuration.
+
+`install.ps1` and `install.sh` keep an existing certificate and an existing `.env`. Run them after a pull so any new Python package is installed. Then restart VOCE so the running process loads the new code. Open `https://127.0.0.1:8080/health` and confirm `"status": "ok"`. Endpoints you already saved stay registered.
 
 ## Windows
 
@@ -539,13 +623,67 @@ Linux cron, with the agent already listening:
 
 ## Move to another server
 
-1. Install Python 3.11 or newer, using the Requirements steps above.
-2. Copy the application folder without `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls`.
+1. Install Git and Python 3.11 or newer, using the Requirements steps above.
+2. Clone `https://github.com/ppundkar/OPSVI.git` with the commands in Clone or update from Git. A folder copy also works if you leave out `.venv`, `.env`, `out`, `data/endpoints.json`, and `data/tls`.
 3. Run `install.ps1` or `install.sh`.
 4. Edit the new `.env` for the bind address, API key, Teams, and Power BI values.
-5. Start the agent and register the endpoints again, using Get to a working scan above.
+5. Start the agent and register the endpoints again, using Get to a working scan above. To refresh this server later, use the update commands in that same Git section.
 
 Re-registering on the new server avoids copying passwords inside the application folder.
+
+## Uninstall
+
+Uninstall stops VOCE on this server and removes the files the installer created here. It does not remove Python, Git, or PowerCLI. It does not change vCenter, NSX, Aria, or VCF. Run it from the project folder, the one that contains `install.ps1`.
+
+Windows:
+
+```powershell
+Set-Location C:\VOCE\OPSVI
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1
+```
+
+Linux:
+
+```bash
+cd /opt/voce/OPSVI
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+If you installed the systemd service, run `sudo ./uninstall.sh` so it can stop and delete `vmware-cost-agent`.
+
+The script does four things:
+
+1. Stops the VOCE process that was started from this folder.
+2. On Windows, deletes the scheduled tasks `VOCE` and `VOCE Scan` when those tasks point at this folder. A task that points at a different copy is left alone.
+3. On Windows, removes this server's default VOCE certificate from the current user's personal store and Trusted Root store. A company certificate you imported yourself is left in the store. On another computer that trusted `data/tls/voce.cer`, open the certificate store and remove that certificate by hand.
+4. Deletes `.venv`, `.env`, `data`, and `out`. That removes saved endpoint passwords, the HTTPS private key, and reports.
+
+The source folder stays, so you can run `install.ps1` or `install.sh` again later.
+
+To uninstall the program but keep passwords, the certificate, and reports:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -KeepConfig
+```
+
+```bash
+./uninstall.sh --keep-config
+```
+
+To also delete the project folder after the cleanup:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -DeleteFolder
+```
+
+```bash
+./uninstall.sh --delete-folder
+```
+
+`-DeleteFolder` and `--delete-folder` remove the clone, including `INSTALL.md`. Copy anything you still need before you use that switch.
+
+If you added the Monday cron line by hand, delete that line from `crontab -e`. The script does not edit cron.
 
 ## Checks
 
