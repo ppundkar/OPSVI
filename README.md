@@ -4,7 +4,7 @@ VMware Cost Optimization Engine. Advisory FinOps for vCenter, NSX-V, NSX-T, Aria
 
 ## Run it
 
-On a new server, follow [INSTALL.md](INSTALL.md). From this folder after installation:
+On a new server, follow [INSTALL.md](INSTALL.md). For day-to-day use of each feature, follow [GUIDE.md](GUIDE.md). From this folder after installation:
 
 ```powershell
 .\start.ps1

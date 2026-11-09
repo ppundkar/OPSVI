@@ -7,9 +7,19 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from agent import __version__
+from agent.auth import (
+    ROLE_RANK,
+    AuthError,
+    Principal,
+    auth_enabled,
+    authenticate,
+    issue_token,
+    read_token,
+    required_role,
+)
 from agent.config import get_settings, load_rates
 from agent.endpoints import load_endpoints
 from agent.models import (
@@ -25,7 +35,7 @@ from agent.integrations.powerbi import push_powerbi
 from agent.integrations.teams import notify_teams
 from agent.orchestrator import probe_all
 from agent.registry import delete_endpoint, get_endpoint, list_public, register_endpoint, update_endpoint
-from agent.reports.export import render_admin, render_dashboard
+from agent.reports.export import render_admin, render_dashboard, render_login
 from agent.service import ReportStore, TtlCache, run_analysis
 from agent.timing import TimingBoard
 
@@ -49,12 +59,37 @@ app.add_middleware(GZipMiddleware, minimum_size=800)
 
 
 @app.middleware("http")
-async def api_key_gate(request: Request, call_next):
+async def access_gate(request: Request, call_next):
     settings = getattr(request.app.state, "settings", None)
-    if settings and settings.api_key and request.url.path.startswith("/v1"):
+    path = request.url.path
+    if settings and settings.api_key and path.startswith("/v1") and not auth_enabled(settings):
         if request.headers.get("x-api-key") != settings.api_key:
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    if not settings or not auth_enabled(settings) or _public(path):
+        return await call_next(request)
+    principal = _principal(request, settings)
+    if principal is None:
+        if path.startswith("/v1"):
+            return JSONResponse({"detail": "Sign in required"}, status_code=401)
+        return RedirectResponse("/login", status_code=303)
+    needed = required_role(request.method, path)
+    if ROLE_RANK[principal.role] < ROLE_RANK[needed]:
+        if path.startswith("/v1"):
+            return JSONResponse({"detail": "This role cannot perform that action"}, status_code=403)
+        return HTMLResponse("This role cannot open that page.", status_code=403)
+    request.state.user = principal.username
+    request.state.role = principal.role
     return await call_next(request)
+
+
+def _public(path: str) -> bool:
+    return path in {"/health", "/v1/health", "/login"}
+
+
+def _principal(request: Request, settings) -> Principal | None:
+    if request.url.path.startswith("/v1") and settings.api_key and request.headers.get("x-api-key") == settings.api_key:
+        return Principal("api-key", "admin")
+    return read_token(request.cookies.get("voce_session", ""), settings)
 
 
 @app.middleware("http")
@@ -78,13 +113,58 @@ async def value_error(_, exc: ValueError):
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard() -> str:
-    return render_dashboard()
+def dashboard(request: Request) -> str:
+    return render_dashboard(_user(request), _role(request))
 
 
 @app.get("/admin", response_class=HTMLResponse)
-def admin() -> str:
-    return render_admin()
+def admin(request: Request) -> str:
+    return render_admin(_user(request), _role(request))
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    if not auth_enabled(request.app.state.settings):
+        return RedirectResponse("/", status_code=303)
+    return render_login()
+
+
+@app.post("/login")
+async def login_submit(request: Request):
+    settings = request.app.state.settings
+    if not auth_enabled(settings):
+        return RedirectResponse("/", status_code=303)
+    form = await request.form()
+    try:
+        principal = authenticate(str(form.get("username") or ""), str(form.get("password") or ""), settings)
+    except AuthError as exc:
+        return HTMLResponse(render_login(str(exc)), status_code=401)
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        "voce_session",
+        issue_token(principal, settings),
+        max_age=max(60, settings.session_ttl_seconds),
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+    )
+    return response
+
+
+@app.post("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie("voce_session", path="/")
+    return response
+
+
+def _user(request: Request) -> str:
+    return str(getattr(request.state, "user", "") or "")
+
+
+def _role(request: Request) -> str:
+    return str(getattr(request.state, "role", "") or "")
 
 
 @app.get("/health")

@@ -1,6 +1,6 @@
 # Installation
 
-Install VOCE (VMware Cost Optimization Engine) on Windows or Linux, then register vCenter, NSX, Aria Operations, and VCF from the admin page. The same folder runs on any server that has Python 3.11 or newer. VOCE does not change vSphere, NSX, or VCF objects.
+Install VOCE (VMware Cost Optimization Engine) on Windows or Linux, then register vCenter, NSX, Aria Operations, and VCF from the admin page. Day-to-day use of each feature is in [GUIDE.md](GUIDE.md). The same folder runs on any server that has Python 3.11 or newer. VOCE does not change vSphere, NSX, or VCF objects.
 
 ## What you copy
 
@@ -163,6 +163,55 @@ The script trusts the certificate named by `VCO_SSL_CERTFILE`. A scheduled task 
 
 To return to the default certificate, set the two `.env` values back to `data/tls/cert.pem` and `data/tls/key.pem`, or delete those files and run `.\enable-https.ps1` or `./enable-https.sh` again.
 
+## Optional Active Directory sign-in and roles
+
+Leave this off when the server is only opened from itself. Turn it on when people open VOCE from other computers. With sign-in off, the pages stay open and no Active Directory group is required.
+
+VOCE checks Active Directory over LDAPS. It does not change accounts or group membership. A person receives one role from their groups:
+
+| Role | Active Directory group | What they can do |
+| --- | --- | --- |
+| Viewer | `VOCE-Viewers` | Open the dashboard and download HTML and CSV reports |
+| Operator | `VOCE-Operators` | Viewer rights, plus run a scan, test logins, notify Teams, and push Power BI |
+| Admin | `VOCE-Admins` | Operator rights, plus register, edit, and remove endpoints |
+
+An account in more than one group receives the highest role. An account in none of the groups cannot sign in.
+
+1. In Active Directory Users and Computers, create the three groups `VOCE-Admins`, `VOCE-Operators`, and `VOCE-Viewers`. Put each person in one group.
+2. Trust the domain controller certificate, then confirm port 636 is open. LDAPS is required for sign-in, and `VCO_AD_VERIFY_TLS=true` rejects the connection unless the certificate chain is trusted. This is the domain controller certificate, not the VOCE certificate in `data/tls`.
+   1. On a domain controller, export the issuing certificate authority as a Base-64 `.cer` file. Export the domain controller certificate as well when its subject name is not the name you will put in `VCO_AD_URL`.
+   2. On the VOCE server, import the authority into Trusted Root Certification Authorities for the computer account. On Linux, copy the `.cer` into `/usr/local/share/ca-certificates/` and run `update-ca-certificates`.
+   3. The name in `VCO_AD_URL` must match a DNS name on the domain controller certificate. `ldaps://dc01.corp.example:636` fails when the certificate only lists `dc01.corp.example` under another name.
+   4. From the VOCE server, test the trust before starting sign-in. A successful test prints the certificate subject and does not print a verify error.
+
+```powershell
+openssl s_client -connect dc01.corp.example:636 -showcerts
+```
+
+   Leave `VCO_AD_VERIFY_TLS=true`. Set it to `false` only in a lab where the domain controller certificate cannot be trusted.
+3. Add the settings below to `.env` on the VOCE server. Use the domain's real names. `VCO_AD_DOMAIN` is the DNS name people use after `@` when they sign in with a short account name.
+
+```text
+VCO_AUTH_MODE=ad
+VCO_AD_URL=ldaps://dc.corp.example:636
+VCO_AD_BASE_DN=DC=corp,DC=example
+VCO_AD_DOMAIN=corp.example
+VCO_AD_VERIFY_TLS=true
+VCO_AD_GROUP_ADMIN=VOCE-Admins
+VCO_AD_GROUP_OPERATOR=VOCE-Operators
+VCO_AD_GROUP_VIEWER=VOCE-Viewers
+```
+
+4. Leave `VCO_AD_BIND_DN` and `VCO_AD_BIND_PASSWORD` empty when each person can read their own group membership. If a sign-in succeeds at Active Directory but VOCE still says the account was not accepted, set those two values to a read-only account that can search users under `VCO_AD_BASE_DN`. That account is used only to find the person. VOCE still checks the person's own password.
+5. Set `VCO_API_KEY` to a long random value. The Monday scan and `Invoke-CostOptimization.ps1` send this key and do not use a person's password. Treat the key like an admin password. It is stored only in `.env`.
+6. Restart VOCE with `.\start.ps1` or `./start.sh`.
+7. Open `https://<server>:8080`. The browser goes to the sign-in page. Sign in as a member of `VOCE-Viewers` and confirm the scan buttons are absent. Sign out, then sign in as a member of `VOCE-Admins` and open Endpoints.
+8. On the server, run `.\powershell\Invoke-CostOptimization.ps1 -Demo`. The script reads `VCO_API_KEY` from `.env` and does not prompt for an Active Directory password.
+
+To turn sign-in off again, clear `VCO_AUTH_MODE` and restart. The pages open without a password, as they did at install.
+
+A group value can be the group name, as above, or the full distinguished name. The name matches the `CN` of the group.
+
 ## Listen on the network
 
 The default bind is `127.0.0.1`, so only the server itself can open the page. `enable-https.ps1` sets `VCO_HOST=0.0.0.0`. To reach the page without HTTPS, edit `.env`:
@@ -173,7 +222,7 @@ VCO_PORT=8080
 VCO_API_KEY=choose-a-long-random-key
 ```
 
-Browser calls from the dashboard do not send `VCO_API_KEY`. Leave that key empty when people use the pages in a browser, and limit the port with the firewall. Set the key when scripts call `/v1` from another machine, and send the header `X-API-Key`.
+Browser calls from the dashboard do not send `VCO_API_KEY`. For people using the pages from other computers, turn on Active Directory sign-in in the section above. Set `VCO_API_KEY` when scripts call `/v1`, and send the header `X-API-Key`.
 
 Example tunnel from your workstation:
 

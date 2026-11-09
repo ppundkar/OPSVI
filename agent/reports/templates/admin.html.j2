@@ -16,6 +16,12 @@
       <a class="button secondary" href="/">Dashboard</a>
       <button id="reset" class="secondary" type="button">New endpoint</button>
       <div class="time-pill" id="time-pill">Ready</div>
+      {% if user %}
+      <form method="post" action="/logout" class="signout">
+        <span>{{ user }} · {{ role }}</span>
+        <button class="secondary" type="submit">Sign out</button>
+      </form>
+      {% endif %}
     </div>
     <div id="banner"></div>
   </header>
@@ -107,6 +113,7 @@
       const started = performance.now();
       const response = await fetch("/v1/admin/endpoints");
       const payload = await response.json();
+      if (response.status === 401) { window.location = "/login"; return; }
       if (!response.ok) {
         banner(payload.detail || "Could not load endpoints", true);
         return;

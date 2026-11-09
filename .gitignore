@@ -7,6 +7,7 @@ __pycache__/
 data/endpoints.json
 data/*.tmp
 data/tls/
+data/session.key
 config/endpoints.yaml
 out/
 *.log

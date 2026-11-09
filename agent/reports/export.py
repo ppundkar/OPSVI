@@ -24,12 +24,16 @@ def _brand() -> dict[str, str]:
     return {"product_name": PRODUCT_NAME, "product_short": PRODUCT_SHORT}
 
 
-def render_dashboard() -> str:
-    return _ENV.get_template("dashboard.html.j2").render(css=_CSS, **_brand())
+def render_dashboard(user: str = "", role: str = "") -> str:
+    return _ENV.get_template("dashboard.html.j2").render(css=_CSS, user=user, role=role, **_brand())
 
 
-def render_admin() -> str:
-    return _ENV.get_template("admin.html.j2").render(css=_CSS, **_brand())
+def render_admin(user: str = "", role: str = "") -> str:
+    return _ENV.get_template("admin.html.j2").render(css=_CSS, user=user, role=role, **_brand())
+
+
+def render_login(error: str = "") -> str:
+    return _ENV.get_template("login.html.j2").render(css=_CSS, error=error, **_brand())
 
 
 def render_report(result: OptimizeResponse) -> str:

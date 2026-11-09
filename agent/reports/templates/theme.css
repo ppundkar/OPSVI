@@ -59,6 +59,11 @@ button, .button {
 }
 
 button.secondary, .button.secondary { background: transparent; color: var(--ink); }
+.signout { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.signout span { color: var(--muted); font-size: 13px; }
+.login-card { max-width: 420px; margin-top: 24px; }
+.login-card input { width: 100%; }
+.login-error { color: var(--red); }
 
 button:disabled { opacity: 0.55; cursor: wait; }
 

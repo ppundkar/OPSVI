@@ -13,15 +13,23 @@
     <h1>{{ product_name }}</h1>
     <p class="sub">Parallel login across vCenter, NSX, NSX-T, Aria Operations, and VCF. Waste, savings, and recommendations stay on the fast path: cached repeats, a four-second AI cutoff, and PowerCLI only when you ask for it.</p>
     <div class="toolbar">
-      <a class="button secondary" href="/admin">Endpoints</a>
+      {% if not user or role == 'admin' %}<a class="button secondary" href="/admin">Endpoints</a>{% endif %}
+      {% if not user or role in ['operator', 'admin'] %}
       <button id="run" type="button">Analyze demo estate</button>
       <button id="live" class="secondary" type="button">Analyze registered endpoints</button>
       <button id="probe" class="secondary" type="button">Test configured logins</button>
       <button id="teams" class="secondary" type="button">Notify Teams</button>
       <button id="powerbi" class="secondary" type="button">Push Power BI</button>
+      {% endif %}
       <a class="button secondary" id="html-link" href="/v1/reports/latest.html">HTML report</a>
       <a class="button secondary" id="csv-link" href="/v1/reports/latest.csv">CSV</a>
       <div class="time-pill" id="time-pill">Waiting</div>
+      {% if user %}
+      <form method="post" action="/logout" class="signout">
+        <span>{{ user }} · {{ role }}</span>
+        <button class="secondary" type="submit">Sign out</button>
+      </form>
+      {% endif %}
     </div>
     <div id="banner"></div>
   </header>
@@ -97,6 +105,7 @@
         });
         const payload = await response.json();
         const clientMs = performance.now() - started;
+        if (response.status === 401) { window.location = "/login"; return; }
         if (!response.ok) {
           banner(payload.detail || "Analysis failed", true);
           document.getElementById("time-pill").textContent = clientMs.toFixed(0) + " ms";
@@ -178,11 +187,15 @@
 
     document.getElementById("search").addEventListener("input", draw);
     document.getElementById("severity").addEventListener("change", draw);
-    document.getElementById("run").addEventListener("click", () => post({ demo: true, include_ai: true }));
-    document.getElementById("live").addEventListener("click", () => post({ use_config: true, include_ai: true, refresh: true }));
-    document.getElementById("teams").addEventListener("click", () => post({ demo: true, include_ai: true, notify_teams: true }));
-    document.getElementById("powerbi").addEventListener("click", () => post({ demo: true, include_ai: true, push_powerbi: true }));
-    document.getElementById("probe").addEventListener("click", async () => {
+    const run = document.getElementById("run");
+    if (run) {
+      run.addEventListener("click", () => post({ demo: true, include_ai: true }));
+      document.getElementById("live").addEventListener("click", () => post({ use_config: true, include_ai: true, refresh: true }));
+      document.getElementById("teams").addEventListener("click", () => post({ demo: true, include_ai: true, notify_teams: true }));
+      document.getElementById("powerbi").addEventListener("click", () => post({ demo: true, include_ai: true, push_powerbi: true }));
+    }
+    const probe = document.getElementById("probe");
+    if (probe) probe.addEventListener("click", async () => {
       setBusy(true);
       const started = performance.now();
       try {
@@ -211,7 +224,9 @@
         setBusy(false);
       }
     });
+    {% if not user or role in ['operator', 'admin'] %}
     post({ demo: true, include_ai: true });
+    {% endif %}
   </script>
 </body>
 </html>

@@ -87,6 +87,18 @@ class Settings(BaseSettings):
     endpoints_path: str = ""
     ssl_certfile: str = ""
     ssl_keyfile: str = ""
+    auth_mode: str = ""
+    session_secret: str = ""
+    session_ttl_seconds: int = 28800
+    ad_url: str = ""
+    ad_base_dn: str = ""
+    ad_domain: str = ""
+    ad_bind_dn: str = ""
+    ad_bind_password: str = ""
+    ad_verify_tls: bool = True
+    ad_group_admin: str = ""
+    ad_group_operator: str = ""
+    ad_group_viewer: str = ""
 
 
 @lru_cache

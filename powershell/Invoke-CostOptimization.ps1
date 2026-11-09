@@ -51,6 +51,15 @@ if ($chosen.Count -ne 1) {
     throw "Choose exactly one of -Demo, -UseConfig, or -CollectVCenter"
 }
 
+if (-not $ApiKey) {
+    $envFile = Join-Path $PSScriptRoot "..\.env"
+    if (Test-Path $envFile) {
+        foreach ($line in Get-Content $envFile) {
+            if ($line -match '^VCO_API_KEY=(.*)$') { $ApiKey = $Matches[1].Trim() }
+        }
+    }
+}
+
 $headers = @{ "Content-Type" = "application/json" }
 if ($ApiKey) { $headers["X-API-Key"] = $ApiKey }
 
