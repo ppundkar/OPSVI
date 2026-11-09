@@ -106,6 +106,69 @@ def default_cert_is_stale() -> bool:
     return not certificate_covers_server(cert)
 
 
+FALLBACK_PORTS = (8443, 8088, 18080, 8888)
+
+
+def bind_state(host: str, port: int) -> str | None:
+    """Return why a port cannot be used, or None when this process can bind it."""
+
+    bind_host = "0.0.0.0" if host in {"", "::", "0.0.0.0"} else host
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((bind_host, port))
+    except OSError as exc:
+        code = getattr(exc, "winerror", None) or exc.errno
+        if code in {10048, 98}:
+            return "in-use"
+        if code in {10013, 13}:
+            return "forbidden"
+        return "unavailable"
+    return None
+
+
+def choose_port(requested: int, states: dict[int, str | None]) -> int:
+    state = states.get(requested)
+    if state is None:
+        return requested
+    if state == "in-use":
+        raise SystemExit(
+            f"Port {requested} is already in use. Close the other VOCE window, or set VCO_PORT in .env to a free port."
+        )
+    for port in (requested, *FALLBACK_PORTS):
+        if states.get(port) is None:
+            return port
+    raise SystemExit(
+        f"Windows refused port {requested}. Set VCO_PORT in .env to a free port, then run .\\start.ps1 again."
+    )
+
+
+def remember_port(port: int) -> None:
+    path = ROOT / ".env"
+    if not path.is_file():
+        return
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    updated = False
+    for index, line in enumerate(lines):
+        if line.startswith("VCO_PORT="):
+            lines[index] = f"VCO_PORT={port}"
+            updated = True
+    if not updated:
+        lines.append(f"VCO_PORT={port}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def resolve_port(host: str, requested: int) -> tuple[int, str]:
+    candidates = [requested, *[port for port in FALLBACK_PORTS if port != requested]]
+    states = {port: bind_state(host, port) for port in candidates}
+    chosen = choose_port(requested, states)
+    if chosen == requested:
+        return chosen, ""
+    remember_port(chosen)
+    return chosen, (
+        f"Windows refused port {requested}. VOCE is using {chosen} instead, and .env now has VCO_PORT={chosen}."
+    )
+
+
 def print_browse_urls() -> None:
     settings = get_settings()
     ssl = bool(tls_paths(settings)) if settings.ssl_certfile.strip() or settings.ssl_keyfile.strip() else False
@@ -116,6 +179,10 @@ def print_browse_urls() -> None:
 
 def main() -> None:
     settings = get_settings()
+    chosen, notice = resolve_port(settings.host, settings.port)
+    settings.port = chosen
+    if notice:
+        print(notice, flush=True)
     ssl = tls_paths(settings)
     scheme = "https" if ssl else "http"
     print(f"VOCE listening on {scheme}://{settings.host}:{settings.port}", flush=True)

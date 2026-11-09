@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.__main__ import browse_urls, names_cover, public_names, tls_paths
+from agent.__main__ import browse_urls, choose_port, names_cover, public_names, tls_paths
 from agent.config import Settings
 from agent.main import app
 from fastapi.testclient import TestClient
@@ -36,6 +36,13 @@ def test_browse_urls_use_server_name_and_ip():
     assert urls
     assert all(url.startswith("https://") and url.endswith(":8080") for url in urls)
     assert "https://127.0.0.1:8080" not in urls or urls == ["https://127.0.0.1:8080"]
+
+
+def test_forbidden_port_moves_to_a_fallback():
+    assert choose_port(8080, {8080: None}) == 8080
+    assert choose_port(8080, {8080: "forbidden", 8443: None}) == 8443
+    with pytest.raises(SystemExit, match="already in use"):
+        choose_port(8080, {8080: "in-use"})
 
 
 def test_localhost_certificate_does_not_cover_a_server_name():

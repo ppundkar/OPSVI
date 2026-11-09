@@ -348,6 +348,14 @@ On Windows, the install trusts that certificate for the user who ran `install.ps
 
 To use `https://<server>` with no port, set `VCO_PORT=443` and start VOCE from an elevated shell. Port 8080 is the default so the process does not need that privilege.
 
+If `.\start.ps1` stops with `winerror 10013` on port 8080, Windows has reserved that port. VOCE then tries 8443 and saves the working port in `.env`. You can also set it yourself:
+
+```text
+VCO_PORT=8443
+```
+
+Run `.\start.ps1` again and open the dashboard address it prints, including the new port.
+
 To add a name that was not known at install time, run the helper again and restart. This replaces the default certificate.
 
 ```powershell
