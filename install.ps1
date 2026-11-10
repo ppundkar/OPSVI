@@ -58,7 +58,6 @@ Write-Host "Guide:  INSTALL.md"
 Write-Host ""
 
 function Install-VoceService {
-    $pythonExe = Join-Path $Root ".venv\Scripts\python.exe"
     foreach ($path in @(
         $Root,
         (Join-Path $Root ".venv"),
@@ -72,12 +71,15 @@ function Install-VoceService {
             icacls $path /grant "SYSTEM:(OI)(CI)M" | Out-Null
         }
     }
-    $action = New-ScheduledTaskAction -Execute $pythonExe -Argument "-m agent" -WorkingDirectory $Root
+    $runner = Join-Path $Root "run-service.ps1"
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$runner`"" -WorkingDirectory $Root
     $trigger = New-ScheduledTaskTrigger -AtStartup
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-    Register-ScheduledTask -TaskName "VOCE" -Action $action -Trigger $trigger -Settings $settings -User "SYSTEM" -RunLevel Highest -Force | Out-Null
-    Write-Host "VOCE is registered to start at boot and to restart if it stops."
-    Write-Host "Closing a terminal or disconnecting from the jump box does not stop it."
+    $trigger.Delay = "PT30S"
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+    $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName "VOCE" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+    Write-Host "Task Scheduler task VOCE stays in the Running state while the site is up."
+    Write-Host "It starts 30 seconds after boot and starts again if it stops."
 }
 
 if ($Service) {

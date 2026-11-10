@@ -13,28 +13,50 @@ if (Test-Path $envFile) {
     }
 }
 
-$listening = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if ($listening) {
-    Write-Host "VOCE is already running on port $port."
-    Write-Host "Closing this window does not stop it."
+function Test-VoceListening {
+    return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
+}
+
+$task = Get-ScheduledTask -TaskName "VOCE" -ErrorAction SilentlyContinue
+if (-not $task) {
+    Write-Host "The VOCE startup task is not registered, so the site stops when Windows restarts."
+    Write-Host "Open PowerShell as Administrator in this folder and run:"
+    Write-Host "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service"
+    exit 1
+}
+
+if ($task.State -eq "Running" -and (Test-VoceListening)) {
+    Write-Host "VOCE is already running. Task Scheduler shows task VOCE as Running."
     & $python -c "from agent.__main__ import print_browse_urls; print_browse_urls()"
     exit 0
 }
 
-$outDir = Join-Path $PSScriptRoot "out"
-New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-$stdout = Join-Path $outDir "voce.log"
-$stderr = Join-Path $outDir "voce.err.log"
-Start-Process -FilePath $python -ArgumentList "-m", "agent" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-Start-Sleep -Seconds 2
-$listening = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if (-not $listening) {
-    Write-Host "VOCE did not stay running. The last lines of the log:"
-    if (Test-Path $stderr) { Get-Content $stderr -Tail 20 }
+if (Test-VoceListening) {
+    Write-Host "Stopping a copy of VOCE that is not the scheduled task."
+    $owners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+    foreach ($procId in $owners) {
+        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 1
+}
+
+Start-ScheduledTask -TaskName "VOCE"
+$ready = $false
+foreach ($try in 1..15) {
+    Start-Sleep -Seconds 1
+    $task = Get-ScheduledTask -TaskName "VOCE"
+    if ($task.State -eq "Running" -and (Test-VoceListening)) {
+        $ready = $true
+        break
+    }
+}
+if (-not $ready) {
+    Write-Host "Task VOCE did not stay running. The last lines of out\voce-service.log:"
+    $log = Join-Path $PSScriptRoot "out\voce-service.log"
+    if (Test-Path $log) { Get-Content $log -Tail 30 }
     exit 1
 }
-Write-Host "VOCE is running in the background. Closing this window does not stop it."
-Write-Host "Log: $stdout"
+Write-Host "VOCE is running. Task Scheduler shows task VOCE as Running."
+Write-Host "Closing this window does not stop it, and it starts again after boot."
 & $python -c "from agent.__main__ import print_browse_urls; print_browse_urls()"

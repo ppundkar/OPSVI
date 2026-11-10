@@ -178,19 +178,14 @@ To install and start immediately:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Start
 ```
 
-To register a task that starts the agent when the server boots:
+Register the startup task from an Administrator PowerShell window. This is what keeps the site up after boot. In Task Scheduler, task `VOCE` stays **Running** while the page is available.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service
+.\start.ps1
 ```
 
-The task name is `VOCE`. Run this from an Administrator PowerShell so VOCE starts at boot, restarts if it stops, and keeps running after the terminal closes or the remote session disconnects:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service
-```
-
-`.\start.ps1` also starts VOCE in the background. Closing that window does not stop the site. The log is `out\voce.log`.
+`.\start.ps1` starts that task. It does not start a second copy in the terminal. The task starts 30 seconds after boot and starts again within a minute if the process stops. The service log is `out\voce-service.log`. Open the dashboard address printed by `.\start.ps1`, including the port.
 
 ## Linux
 
