@@ -31,7 +31,7 @@ def main() -> None:
         refresh=args.refresh,
     )
     settings = get_settings()
-    result, _, _ = asyncio.run(run_analysis(request, settings, load_rates(), TtlCache()))
+    result, *_ = asyncio.run(run_analysis(request, settings, load_rates(), TtlCache()))
     if args.notify_teams:
         result.teams = asyncio.run(notify_teams(result, settings))
     if args.push_powerbi:

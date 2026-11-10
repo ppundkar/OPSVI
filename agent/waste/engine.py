@@ -45,14 +45,14 @@ def analyze(inventory: Inventory, rates: Rates) -> list[Finding]:
             continue
         findings.append(
             _make(
-                category="orphaned_disk",
+                category="zombie_vmdk",
                 severity="high" if datastore.orphaned_gb >= 500 else "medium",
                 confidence=0.85,
                 endpoint_id=datastore.endpoint_id,
                 resource_type="datastore",
                 resource_id=datastore.id,
                 resource_name=datastore.name,
-                title=f"Orphaned disks on {datastore.name}",
+                title=f"Zombie VMDKs on {datastore.name}",
                 detail=(
                     f"{datastore.orphaned_gb:.0f} GB of VMDK files are not attached to a registered VM."
                 ),
@@ -266,14 +266,14 @@ def _powered_off(vm: VmRecord, rates: Rates) -> Finding:
     if vm.snapshot_gb > 0:
         snapshot_note = f" Snapshots still hold {vm.snapshot_gb:.0f} GB and are included in the delete."
     return _make(
-        category="powered_off",
+        category="zombie_vm",
         severity="high" if (vm.powered_off_days or 0) >= rates.thresholds.powered_off_days else "medium",
         confidence=0.9 if vm.powered_off_days is not None else 0.6,
         endpoint_id=vm.endpoint_id,
         resource_type="vm",
         resource_id=vm.id,
         resource_name=vm.name,
-        title=f"{vm.power_state} VM {vm.name}",
+        title=f"Zombie VM {vm.name}",
         detail=(
             f"{vm.name} has been {vm.power_state} for {age} with {vm.vcpu} vCPU, "
             f"{vm.memory_gb:.0f} GB RAM, and {vm.used_gb:.0f} GB used storage.{snapshot_note}"

@@ -47,11 +47,20 @@
     </section>
     <section class="panel">
       <h2>Recommendations</h2>
+      <div class="toolbar">
+        <a class="button secondary" href="/v1/reports/latest-recommendations.html">Export HTML</a>
+        <a class="button secondary" href="/v1/reports/latest-recommendations.csv">Export CSV</a>
+      </div>
       <p id="ai-summary" class="muted">The rules engine ranks findings by committed savings. A model is used only when an API key is configured, and only within a four-second budget.</p>
       <div class="actions" id="actions"></div>
     </section>
     <section class="panel">
-      <h2>Findings</h2>
+      <div class="tabs">
+        <button id="tab-findings" type="button" aria-selected="true">Findings</button>
+        <button id="tab-zombies" class="secondary" type="button" aria-selected="false">Zombie VMs and VMDKs</button>
+      </div>
+      <h2 id="findings-title">Findings</h2>
+      <p id="zombie-note" class="muted" hidden>Zombie VMs are powered off or suspended. Zombie VMDKs are disk files that are not attached to a registered VM. Turn on Scan zombie VMDKs for that vCenter to search the datastores.</p>
       <div class="filters">
         <input id="search" type="search" placeholder="Filter by name, category, or endpoint" aria-label="Filter findings">
         <select id="severity" aria-label="Severity">
@@ -79,7 +88,7 @@
     Advisory only. This agent does not power off, resize, or delete vSphere, NSX, or VCF objects. The conservative total excludes host and VCF consolidation because that capacity is already reflected on virtual machines.
   </footer>
   <script>
-    const state = { findings: [], payload: null };
+    const state = { findings: [], payload: null, tab: "findings" };
     const money = (value, currency) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(value || 0);
     const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
@@ -173,6 +182,8 @@
       const severity = document.getElementById("severity").value;
       const rows = state.findings.filter((item) => {
         const hay = (item.resource_name + " " + item.category + " " + item.endpoint_id + " " + item.title).toLowerCase();
+        const zombie = item.category === "zombie_vm" || item.category === "zombie_vmdk";
+        if (state.tab === "zombies" && !zombie) return false;
         return (!query || hay.includes(query)) && (!severity || item.severity === severity);
       });
       document.getElementById("rows").innerHTML = rows.map((item) => `
@@ -187,6 +198,17 @@
 
     document.getElementById("search").addEventListener("input", draw);
     document.getElementById("severity").addEventListener("change", draw);
+    state.tab = "findings";
+    document.getElementById("tab-findings").addEventListener("click", () => selectTab("findings"));
+    document.getElementById("tab-zombies").addEventListener("click", () => selectTab("zombies"));
+    function selectTab(tab) {
+      state.tab = tab;
+      document.getElementById("tab-findings").setAttribute("aria-selected", tab === "findings" ? "true" : "false");
+      document.getElementById("tab-zombies").setAttribute("aria-selected", tab === "zombies" ? "true" : "false");
+      document.getElementById("findings-title").textContent = tab === "zombies" ? "Zombie VMs and VMDKs" : "Findings";
+      document.getElementById("zombie-note").hidden = tab !== "zombies";
+      draw();
+    }
     const run = document.getElementById("run");
     if (run) {
       run.addEventListener("click", () => post({ demo: true, include_ai: true }));

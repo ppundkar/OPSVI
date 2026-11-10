@@ -231,9 +231,11 @@ async def admin_test(endpoint_id: str, request: Request) -> EndpointStatus:
 @app.post("/v1/optimize", response_model=OptimizeResponse)
 async def optimize(body: OptimizeRequest, request: Request) -> OptimizeResponse:
     state = request.app.state
-    result, html, csv_text = await run_analysis(body, state.settings, state.rates, state.cache)
+    result, html, csv_text, rec_html, rec_csv = await run_analysis(body, state.settings, state.rates, state.cache)
     if html:
         state.reports.put(result.analysis_id, html, csv_text)
+    if rec_html:
+        state.reports.put(f"{result.analysis_id}-recommendations", rec_html, rec_csv, make_latest=False)
     if body.notify_teams:
         result.teams = await notify_teams(result, state.settings)
     if body.push_powerbi:
@@ -264,7 +266,10 @@ def report_file(request: Request, report_name: str):
 
 def _lookup(request: Request, analysis_id: str, kind: str) -> str:
     store: ReportStore = request.app.state.reports
-    chosen = store.latest if analysis_id == "latest" else analysis_id
+    if analysis_id == "latest-recommendations":
+        chosen = f"{store.latest}-recommendations" if store.latest else None
+    else:
+        chosen = store.latest if analysis_id == "latest" else analysis_id
     if not chosen:
         raise HTTPException(status_code=404, detail="No report yet. Run an analysis first.")
     bucket = store.html if kind == "html" else store.csv

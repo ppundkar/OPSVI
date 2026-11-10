@@ -46,7 +46,7 @@
         <label class="check"><input id="verify_ssl" name="verify_ssl" type="checkbox" checked> Verify TLS certificate</label>
         <label class="check"><input id="use_powershell" name="use_powershell" type="checkbox"> Use PowerCLI for this vCenter</label>
         <label class="check"><input id="deep_stats" name="deep_stats" type="checkbox"> Deep 7-day stats</label>
-        <label class="check"><input id="orphaned_disks" name="orphaned_disks" type="checkbox"> Scan orphaned disks</label>
+        <label class="check"><input id="orphaned_disks" name="orphaned_disks" type="checkbox"> Scan zombie VMDKs</label>
         <div class="span-2"><button type="submit" id="save">Save endpoint</button></div>
       </form>
       <p class="muted">PowerCLI, deep stats, and orphaned-disk scans apply to vCenter only. Leave the password blank when editing to keep the current secret. A value of ${ENV:NAME} reads that variable on the server at scan time.</p>

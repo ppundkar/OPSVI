@@ -8,6 +8,7 @@ data/endpoints.json
 data/*.tmp
 data/tls/
 data/session.key
+data/voce.pid
 config/endpoints.yaml
 out/
 *.log

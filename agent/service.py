@@ -22,7 +22,7 @@ from agent.models import (
     OptimizeResponse,
 )
 from agent.orchestrator import collect_all
-from agent.reports.export import findings_csv, render_report, write_exports
+from agent.reports.export import findings_csv, recommendations_csv, recommendations_html, render_report, write_exports
 from agent.waste.engine import analyze, summarize
 
 MAX_VMS = 20000
@@ -56,10 +56,11 @@ class ReportStore:
         self.csv: dict[str, str] = {}
         self.latest: str | None = None
 
-    def put(self, analysis_id: str, html: str, csv_text: str) -> None:
+    def put(self, analysis_id: str, html: str, csv_text: str, *, make_latest: bool = True) -> None:
         self.html[analysis_id] = html
         self.csv[analysis_id] = csv_text
-        self.latest = analysis_id
+        if make_latest:
+            self.latest = analysis_id
         if len(self.html) > 20:
             oldest = next(iter(self.html))
             self.html.pop(oldest, None)
@@ -101,7 +102,7 @@ async def run_analysis(
     settings: Settings,
     rates: Rates,
     cache: TtlCache,
-) -> tuple[OptimizeResponse, str, str]:
+) -> tuple[OptimizeResponse, str, str, str, str]:
     validate_request(request)
     signature = _config_signature(settings) if request.use_config else ""
     key = cache_key(request, rates, signature)
@@ -113,8 +114,8 @@ async def run_analysis(
         result.duration_ms = round((time.perf_counter() - started) * 1000, 2)
         result.teams = None
         result.powerbi = None
-        html, csv_text = _read_saved(result)
-        return result, html, csv_text
+        html, csv_text, _, _ = _read_saved(result)
+        return result, html, csv_text, recommendations_html(result), recommendations_csv(result)
 
     mode, inventory, statuses, collect_ms = await _collect(request, settings)
     skipped_templates = exclude_templates(inventory)
@@ -178,10 +179,14 @@ async def run_analysis(
     result.duration_ms = round((time.perf_counter() - started) * 1000, 2)
     html = render_report(result)
     csv_text = findings_csv(result)
+    rec_html = recommendations_html(result)
+    rec_csv = recommendations_csv(result)
     html_path.write_text(html, encoding="utf-8")
     (OUT / "reports" / "latest.html").write_text(html, encoding="utf-8")
+    (OUT / "reports" / "latest-recommendations.html").write_text(rec_html, encoding="utf-8")
+    (OUT / "reports" / "latest-recommendations.csv").write_text("\ufeff" + rec_csv, encoding="utf-8")
     cache.put(key, result.model_copy(deep=True))
-    return result, html, csv_text
+    return result, html, csv_text, rec_html, rec_csv
 
 
 async def _collect(
@@ -248,11 +253,18 @@ def _config_signature(settings: Settings) -> str:
     return f"{path}:{stat.st_mtime_ns}:{stat.st_size}"
 
 
-def _read_saved(result: OptimizeResponse) -> tuple[str, str]:
-    html_path = OUT / "reports" / f"{result.analysis_id}.html"
-    csv_path = OUT / "reports" / f"{result.analysis_id}.csv"
+def _read_saved(result: OptimizeResponse) -> tuple[str, str, str, str]:
+    report_dir = OUT / "reports"
+    html_path = report_dir / f"{result.analysis_id}.html"
+    csv_path = report_dir / f"{result.analysis_id}.csv"
+    rec_html_path = report_dir / "latest-recommendations.html"
+    rec_csv_path = report_dir / "latest-recommendations.csv"
     html = html_path.read_text(encoding="utf-8") if html_path.exists() else ""
     csv_text = csv_path.read_text(encoding="utf-8") if csv_path.exists() else ""
+    rec_html = rec_html_path.read_text(encoding="utf-8") if rec_html_path.exists() else ""
+    rec_csv = rec_csv_path.read_text(encoding="utf-8") if rec_csv_path.exists() else ""
     if csv_text.startswith("\ufeff"):
         csv_text = csv_text.lstrip("\ufeff")
-    return html, csv_text
+    if rec_csv.startswith("\ufeff"):
+        rec_csv = rec_csv.lstrip("\ufeff")
+    return html, csv_text, rec_html, rec_csv

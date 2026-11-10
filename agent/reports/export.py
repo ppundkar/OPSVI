@@ -128,6 +128,61 @@ def summary_csv(result: OptimizeResponse) -> str:
     return buffer.getvalue()
 
 
+def recommendations_csv(result: OptimizeResponse) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(["AnalysisId", "CollectedAt", "Source", "Priority", "Title", "MonthlySavings", "Risk", "Steps"])
+    for action in result.ai.actions:
+        writer.writerow(
+            [
+                result.analysis_id,
+                result.collected_at,
+                result.ai.source,
+                action.priority,
+                action.title,
+                action.monthly_savings_usd,
+                action.risk,
+                " ".join(action.steps),
+            ]
+        )
+    return buffer.getvalue()
+
+
+def recommendations_html(result: OptimizeResponse) -> str:
+    rows = []
+    for action in result.ai.actions:
+        steps = " ".join(action.steps)
+        rows.append(
+            "<tr>"
+            f"<td>{action.priority}</td>"
+            f"<td>{_escape(action.title)}</td>"
+            f"<td>{action.monthly_savings_usd:.2f}</td>"
+            f"<td>{_escape(action.risk)}</td>"
+            f"<td>{_escape(steps)}</td>"
+            "</tr>"
+        )
+    body = "\n".join(rows) or "<tr><td colspan='5'>No recommendations.</td></tr>"
+    source = "Rules engine" if result.ai.source == "rules" else "Model"
+    return (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        f"<title>{PRODUCT_SHORT} recommendations</title></head><body>"
+        f"<h1>{PRODUCT_SHORT} recommendations</h1>"
+        f"<p>{source}. {_escape(result.ai.summary)}</p>"
+        "<table><thead><tr><th>Priority</th><th>Title</th><th>Monthly</th><th>Risk</th><th>Steps</th></tr></thead>"
+        f"<tbody>{body}</tbody></table></body></html>"
+    )
+
+
+def _escape(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 def write_exports(result: OptimizeResponse) -> tuple[Path, Path, Path, Path]:
     report_dir = OUT / "reports"
     powerbi_dir = OUT / "powerbi"
@@ -146,4 +201,6 @@ def write_exports(result: OptimizeResponse) -> tuple[Path, Path, Path, Path]:
     summary_path = powerbi_dir / "summary.csv"
     findings_path.write_text("\ufeff" + findings, encoding="utf-8")
     summary_path.write_text("\ufeff" + summary, encoding="utf-8")
+    (report_dir / "latest-recommendations.html").write_text(recommendations_html(result), encoding="utf-8")
+    (report_dir / "latest-recommendations.csv").write_text("\ufeff" + recommendations_csv(result), encoding="utf-8")
     return html_path, csv_path, findings_path, summary_path

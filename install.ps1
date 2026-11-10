@@ -54,14 +54,40 @@ if ($certExists) {
 Write-Host ""
 Write-Host "Installed in $Root"
 Write-Host "Start:  .\start.ps1"
-& ".\.venv\Scripts\python.exe" -c "from agent.__main__ import print_browse_urls; print_browse_urls()"
 Write-Host "Guide:  INSTALL.md"
 Write-Host ""
 
+function Install-VoceService {
+    $pythonExe = Join-Path $Root ".venv\Scripts\python.exe"
+    foreach ($path in @(
+        $Root,
+        (Join-Path $Root ".venv"),
+        (Join-Path $Root "agent"),
+        (Join-Path $Root "config"),
+        (Join-Path $Root "data"),
+        (Join-Path $Root "out"),
+        (Join-Path $Root ".env")
+    )) {
+        if (Test-Path $path) {
+            icacls $path /grant "SYSTEM:(OI)(CI)M" | Out-Null
+        }
+    }
+    $action = New-ScheduledTaskAction -Execute $pythonExe -Argument "-m agent" -WorkingDirectory $Root
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+    Register-ScheduledTask -TaskName "VOCE" -Action $action -Trigger $trigger -Settings $settings -User "SYSTEM" -RunLevel Highest -Force | Out-Null
+    Write-Host "VOCE is registered to start at boot and to restart if it stops."
+    Write-Host "Closing a terminal or disconnecting from the jump box does not stop it."
+}
+
 if ($Service) {
-    $task = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$Root\start.ps1`""
-    schtasks /Create /TN "VOCE" /SC ONSTART /RL LIMITED /F /TR $task | Out-Host
-    Write-Host "Startup task 'VOCE' registered."
+    try {
+        Install-VoceService
+        Start-ScheduledTask -TaskName "VOCE"
+    } catch {
+        Write-Host "Could not register the startup task. Open PowerShell as Administrator and run .\install.ps1 -Service"
+        Write-Host $_.Exception.Message
+    }
 }
 
 if ($Start) {

@@ -21,20 +21,20 @@ def test_demo_estate_covers_each_waste_class():
     findings = analyze(inventory, Rates())
     found = {item.category for item in findings}
     assert {
-        "powered_off",
+        "zombie_vm",
         "idle_vm",
         "oversized_cpu",
         "oversized_memory",
         "stale_snapshot",
-        "orphaned_disk",
+        "zombie_vmdk",
         "unused_segment",
         "idle_load_balancer",
         "idle_gateway",
         "underutilized_host",
         "vcf_idle_capacity",
     } <= found
-    assert "legacy-app" in names(findings, "powered_off")
-    assert "old-worker" in names(findings, "powered_off")
+    assert "legacy-app" in names(findings, "zombie_vm")
+    assert "old-worker" in names(findings, "zombie_vm")
     assert "dev-sandbox" in names(findings, "idle_vm")
     assert "patch-window" not in names(findings)
     assert "win-template" not in names(findings)
@@ -57,7 +57,7 @@ def test_demo_estate_covers_each_waste_class():
     assert summary.upside_monthly_usd == round(summary.gross_monthly_usd - summary.conservative_monthly_usd, 2)
     assert summary.annual_conservative_usd == round(summary.conservative_monthly_usd * 12, 2)
     assert all(item.overlaps_compute for item in findings if item.category in {"underutilized_host", "vcf_idle_capacity"})
-    assert not any(item.overlaps_compute for item in findings if item.category == "powered_off")
+    assert not any(item.overlaps_compute for item in findings if item.category == "zombie_vm")
 
 
 def test_powered_off_savings_include_compute_and_storage():
@@ -81,7 +81,7 @@ def test_powered_off_savings_include_compute_and_storage():
     assert len(findings) == 1
     expected = round(4 * rates.cpu_vcpu_month + 16 * rates.memory_gb_month + 180 * rates.storage_gb_month, 2)
     assert findings[0].monthly_savings_usd == expected
-    assert findings[0].category == "powered_off"
+    assert findings[0].category == "zombie_vm"
 
 
 def test_idle_holdback_and_rightsizing_skip_when_idle():

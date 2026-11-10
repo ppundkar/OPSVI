@@ -18,7 +18,7 @@ def rules_plan(findings: list[Finding], summary: SavingsSummary) -> AiPlan:
     actions: list[AiAction] = []
     ordered = sorted(findings, key=lambda item: (item.overlaps_compute, -item.monthly_savings_usd))
     for index, finding in enumerate(ordered[:6], start=1):
-        risk = "low" if finding.category in {"stale_snapshot", "unused_segment", "orphaned_disk"} else "medium"
+        risk = "low" if finding.category in {"stale_snapshot", "unused_segment", "zombie_vmdk"} else "medium"
         if finding.overlaps_compute:
             risk = "high"
         actions.append(
@@ -38,7 +38,7 @@ def rules_plan(findings: list[Finding], summary: SavingsSummary) -> AiPlan:
             f"({summary.annual_conservative_usd:,.0f} annual) across {summary.finding_count} findings. "
             f"Another {summary.upside_monthly_usd:,.0f} {summary.currency} per month is consolidation upside "
             "and overlaps compute already counted on virtual machines. "
-            "Start with snapshots, orphaned disks, and powered-off VMs, then rightsizing, then host removal."
+            "Start with snapshots, zombie VMDKs, and zombie VMs, then rightsizing, then host removal."
         )
     return AiPlan(source="rules", summary=text, actions=actions, model_name=None)
 

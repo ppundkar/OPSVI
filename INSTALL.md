@@ -184,7 +184,13 @@ To register a task that starts the agent when the server boots:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service
 ```
 
-The task name is `VOCE`.
+The task name is `VOCE`. Run this from an Administrator PowerShell so VOCE starts at boot, restarts if it stops, and keeps running after the terminal closes or the remote session disconnects:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Service
+```
+
+`.\start.ps1` also starts VOCE in the background. Closing that window does not stop the site. The log is `out\voce.log`.
 
 ## Linux
 

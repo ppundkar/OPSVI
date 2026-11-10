@@ -77,7 +77,7 @@
     </section>
     <section class="panel">
       <h2>How savings are calculated</h2>
-      <p>Powered-off and suspended guests include compute plus used storage, because the action is deletion after a backup check. Idle guests include compute only, with a holdback, because the disks may stay. Rightsizing is the price of the vCPU or memory removed, and memory keeps headroom above the observed average. Snapshot and orphaned-disk savings are storage-only. Unused segments and idle load balancers use the network rates in the contract file. Host and VCF figures are consolidation upside and are excluded from the committed total.</p>
+      <p>Zombie VMs are powered off or suspended. Their savings include compute plus used storage, because the action is deletion after a backup check. Zombie VMDKs are disk files that are not attached to a registered VM, and their savings are storage only. Idle guests include compute only, with a holdback, because the disks may stay. Rightsizing is the price of the vCPU or memory removed, and memory keeps headroom above the observed average. Snapshot savings are storage-only. Unused segments and idle load balancers use the network rates in the contract file. Host and VCF figures are consolidation upside and are excluded from the committed total.</p>
       <p class="muted">Rates are monthly contract assumptions, not an invoice. Replace them in config/rates.yaml. Aria averages override vCenter point samples when both exist. This report does not change infrastructure.</p>
     </section>
   </main>

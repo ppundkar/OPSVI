@@ -43,7 +43,9 @@ h1 { margin: 4px 0 6px; font-size: 32px; letter-spacing: -0.03em; }
 
 .toolbar, .kpis, .grid, .panel { margin-top: 18px; }
 
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar, .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tabs { margin-bottom: 12px; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: white; }
 
 button, .button {
   border: 1px solid var(--ink);
